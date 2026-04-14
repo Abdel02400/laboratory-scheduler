@@ -56,11 +56,19 @@ export class Scheduler {
         }
 
         const slot = this.tracker.getEarliestSlot(equipment.getId());
-        const sorted = [...techs].sort((a, b) => this.tracker.getTechReady(a.getId()) - this.tracker.getTechReady(b.getId()));
+        const sorted = [...techs].sort((a, b) => {
+            const specialtyDiff = a.getSpecialty().length - b.getSpecialty().length;
+            if (specialtyDiff !== 0) {
+                return specialtyDiff;
+            }
+            return this.tracker.getTechReady(a.getId()) - this.tracker.getTechReady(b.getId());
+        });
 
         for (const tech of sorted) {
-            const start = Math.max(sample.arrivalMinutes(), this.tracker.getTechReady(tech.getId()), slot.readyAt, parseTime(tech.getStartTime()));
-            const end = start + sample.getAnalysisTime();
+            const earliest = Math.max(sample.arrivalMinutes(), this.tracker.getTechReady(tech.getId()), slot.readyAt, parseTime(tech.getStartTime()));
+            const duration = tech.adjustedDuration(sample.getAnalysisTime());
+            const start = tech.adjustForLunch(earliest, duration);
+            const end = start + duration;
 
             if (end > parseTime(tech.getEndTime())) {
                 continue;

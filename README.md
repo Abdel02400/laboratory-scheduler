@@ -119,17 +119,23 @@ In the simple version, `technician.specialty` and `sample.type` share the same v
 
 1. Sort samples by priority (`STAT > URGENT > ROUTINE`), then by arrival time.
 2. For each sample, gather candidate equipments (exact match first, `type` fallback second — see _Sample ↔ Equipment matching_).
-3. For each candidate equipment, gather compatible technicians and try to assign one:
-   - `start = max(sample.arrivalTime, technician.nextFreeTime, equipment.nextFreeSlot, technician.startTime)`
-   - `end = start + sample.analysisTime`
+3. For each candidate equipment, gather compatible technicians, sort them by the rule below, then try to assign one:
+   - `earliest = max(sample.arrivalTime, technician.nextFreeTime, equipment.nextFreeSlot, technician.startTime)`
+   - `duration = Math.round(sample.analysisTime / technician.efficiency)` — the brief's rounding rule, encapsulated in `Technician.adjustedDuration`.
+   - `start = technician.adjustForLunch(earliest, duration)` — if the analysis window overlaps the technician's lunch break, the start is pushed to the end of the lunch.
+   - `end = start + duration`
    - If `end` exceeds `technician.endTime`, try the next technician. If no technician fits on this equipment, try the next candidate equipment.
 4. If no combination of equipment and technician fits, the sample is reported as unscheduled with the reason.
 
+### Technician ordering: specialists first
+
+Within the list of technicians compatible with a given sample, the Scheduler sorts by the number of specialties the technician has (ascending), then by their next-free time as a tie-breaker. A technician with a single specialty (e.g. TECH005 with only `MICROBIOLOGY`) is picked before a technician with three specialties (e.g. TECH007 with `CHEMISTRY`, `BLOOD`, `IMMUNOLOGY`).
+
+The reasoning is classic greedy heuristic: **use specialists when they are applicable, save generalists for the harder cases**. If a sample can be handled by both a specialist and a generalist, taking the specialist leaves the generalist available for a later sample that only the generalist could handle. On the intermediate dataset, this simple rule is what lets the scheduler reach 20/20 even with lunch breaks applied — without it, the two long GENETICS ROUTINE samples (S007 120 min, S019 90 min) would both compete for `TECH007` and one would fall off the end of the day.
+
 ### What is intentionally not handled yet
 
-- **Technician lunch breaks.** The `lunchBreak` field is loaded but not consulted. Technicians are considered available during their whole working window.
-- **Equipment maintenance windows.** `maintenanceWindow` is loaded but not consulted. Equipments are available from the start of the day.
-- **Efficiency coefficient.** `technician.efficiency` is loaded but analysis durations are not adjusted yet. The brief asks for `Math.round(duration / efficiency)`; this will be added as a later step.
+- **Equipment maintenance windows.** `maintenanceWindow` is loaded but not consulted. Equipments are available from the start of the day. In the current dataset the maintenance windows fall outside the lab opening hours (07:00–19:00), so ignoring them changes nothing on this input — but the support will be added for the general case.
 - **STAT preemption.** STAT samples are prioritized by the sort but do not interrupt a running analysis.
 
 These are the planned next steps and will be added incrementally.

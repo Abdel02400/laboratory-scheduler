@@ -1,6 +1,7 @@
 import type { Specialty } from '@/core/types/enums/specialty';
 import type { Technician as TechnicianDTO, TechnicianId } from '@/core/types/models/technician';
 import type { TimeString } from '@/core/types/primitives/time';
+import { overlaps, parseRange, type TimeRange } from '@/core/utils/time';
 
 export class Technician {
     private readonly id: TechnicianId;
@@ -10,6 +11,7 @@ export class Technician {
     private readonly startTime: TimeString;
     private readonly endTime: TimeString;
     private readonly lunchBreak: string;
+    private readonly lunch: TimeRange;
 
     constructor(dto: TechnicianDTO) {
         this.id = dto.id;
@@ -19,6 +21,7 @@ export class Technician {
         this.startTime = dto.startTime;
         this.endTime = dto.endTime;
         this.lunchBreak = dto.lunchBreak;
+        this.lunch = parseRange(dto.lunchBreak);
     }
 
     getId(): TechnicianId {
@@ -51,5 +54,14 @@ export class Technician {
 
     canHandle(specialty: string): boolean {
         return this.specialty.some((s) => s === specialty);
+    }
+
+    adjustedDuration(baseDuration: number): number {
+        return Math.round(baseDuration / this.efficiency);
+    }
+
+    adjustForLunch(start: number, duration: number): number {
+        const window = { start, end: start + duration };
+        return overlaps(window, this.lunch) ? this.lunch.end : start;
     }
 }
