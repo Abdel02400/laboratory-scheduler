@@ -1,7 +1,7 @@
 export const PRIORITY = {
-  STAT: "STAT",
-  URGENT: "URGENT",
-  ROUTINE: "ROUTINE",
+    STAT: 'STAT',
+    URGENT: 'URGENT',
+    ROUTINE: 'ROUTINE',
 } as const;
 
 export type Priority = (typeof PRIORITY)[keyof typeof PRIORITY];
