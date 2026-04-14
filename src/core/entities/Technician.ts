@@ -1,6 +1,6 @@
-import type { Specialty } from '@/core/types/specialty';
-import type { Technician as TechnicianDTO, TechnicianId } from '@/core/types/technician';
-import type { TimeString } from '@/core/types/time';
+import type { Specialty } from '@/core/types/enums/specialty';
+import type { Technician as TechnicianDTO, TechnicianId } from '@/core/types/models/technician';
+import type { TimeString } from '@/core/types/primitives/time';
 
 export class Technician {
     private readonly id: TechnicianId;
@@ -47,5 +47,9 @@ export class Technician {
 
     getLunchBreak(): string {
         return this.lunchBreak;
+    }
+
+    canHandle(specialty: string): boolean {
+        return this.specialty.some((s) => s === specialty);
     }
 }

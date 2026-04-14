@@ -1,5 +1,5 @@
-import type { Specialty } from '@/core/types/specialty';
-import type { TimeString } from '@/core/types/time';
+import type { Specialty } from '@/core/types/enums/specialty';
+import type { TimeString } from '@/core/types/primitives/time';
 
 export type TechnicianId = string & { readonly __brand: 'TechnicianId' };
 

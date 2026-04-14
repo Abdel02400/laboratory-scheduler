@@ -1,4 +1,4 @@
-import type { Specialty } from '@/core/types/specialty';
+import type { Specialty } from '@/core/types/enums/specialty';
 
 export type EquipmentId = string & { readonly __brand: 'EquipmentId' };
 

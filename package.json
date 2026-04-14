@@ -10,7 +10,10 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "load": "tsx src/cli/load.ts",
-        "resolve": "tsx src/cli/resolve.ts"
+        "resolve": "tsx src/cli/resolve.ts",
+        "sort": "tsx src/cli/sort.ts",
+        "match": "tsx src/cli/match.ts",
+        "schedule": "tsx src/cli/schedule.ts"
     },
     "dependencies": {
         "next": "16.2.3",

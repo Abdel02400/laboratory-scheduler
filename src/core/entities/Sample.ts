@@ -1,8 +1,8 @@
-import type { AnalysisTime, AnalysisType } from '@/core/types/analysis';
-import type { PatientInfo } from '@/core/types/patient';
-import { PRIORITY, type Priority } from '@/core/types/priority';
-import type { Sample as SampleDTO, SampleId, SampleType } from '@/core/types/sample';
-import type { TimeString } from '@/core/types/time';
+import type { AnalysisTime, AnalysisType } from '@/core/types/enums/analysis';
+import type { PatientInfo } from '@/core/types/models/patient';
+import { PRIORITY, type Priority } from '@/core/types/enums/priority';
+import type { Sample as SampleDTO, SampleId, SampleType } from '@/core/types/models/sample';
+import type { TimeString } from '@/core/types/primitives/time';
 import { parseTime } from '@/core/utils/time';
 
 export class Sample {

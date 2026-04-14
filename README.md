@@ -44,6 +44,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - `pnpm format:check` — check formatting without writing
 - `pnpm load --file=<path-to-json>` — load a lab input JSON file and instantiate the entities (prints a summary)
 - `pnpm resolve --file=<path-to-json>` — resolve each sample to a compatible equipment (prints the mapping)
+- `pnpm sort --file=<path-to-json>` — sort samples by priority then arrival time (prints the sorted list)
+- `pnpm match --file=<path-to-json>` — combine sort + equipment resolver + technician matching (prints each sample's candidates)
+- `pnpm schedule --file=<path-to-json>` — run the full greedy scheduler and print the resulting schedule
 
 ### Loading a lab input
 
@@ -85,6 +88,51 @@ The simple version of the brief uses a different data shape where equipment has 
 - BLOOD samples whose `analysisType` is not in any `compatibleTypes` all route to `EQ001` (the only `BLOOD` equipment), which becomes a bottleneck.
 - `EQ004` (Immunology) ends up unused because no sample has `type: "IMMUNOLOGY"` — immunology-flavored analyses like `"Sérologie HIV"` have `type: "BLOOD"`, so they fall back to `EQ001` instead of going to `EQ004`.
 - This is accepted for now and will be revisited once the scheduler exposes actual throughput metrics.
+
+## Sample ↔ Technician matching
+
+Picking a technician for a sample is done by `findCompatibleTechnicians` in `src/core/scheduler/findTechnicians.ts`. It mirrors the two-step approach used for equipments.
+
+### The two steps
+
+1. **Direct match on `sample.type`.** Technicians whose `specialty` array contains the sample's biological type are preferred. For example, a sample with `type: "BLOOD"` goes to any technician with `"BLOOD"` in their specialties.
+2. **Fallback on `equipment.type`.** If no technician has the sample's type in their specialties, the resolver falls back to the type of the equipment that was already picked for this sample. A `URINE` sample gets routed to its `MICROBIOLOGY` equipment, and any technician with `"MICROBIOLOGY"` in their specialties becomes eligible.
+
+### Why this fallback matters on the intermediate dataset
+
+The intermediate dataset is asymmetric between samples and technicians:
+
+- `sample.type` is one of `BLOOD`, `URINE`, `TISSUE` (biological origin of the specimen).
+- `technician.specialty` is one of `BLOOD`, `CHEMISTRY`, `MICROBIOLOGY`, `IMMUNOLOGY`, `GENETICS` (analytical expertise).
+
+Only `BLOOD` is shared between the two vocabularies. A `URINE` or `TISSUE` sample has **no technician with a matching specialty in step 1**. Without the fallback, 3 samples (S009 URINE, S010 TISSUE, S020 TISSUE) would be unscheduled. The fallback on `equipment.type` bridges the two vocabularies: the equipment resolver already mapped the sample to a `MICROBIOLOGY` equipment, so we pick a technician with `"MICROBIOLOGY"` in their specialties (TECH002, TECH005, TECH008).
+
+### Compatibility with the simple version of the brief
+
+In the simple version, `technician.specialty` and `sample.type` share the same vocabulary (`BLOOD`, `URINE`, `TISSUE`, plus `GENERAL` which means "anything"). Step 1 is enough there, and the fallback never fires. The resolver therefore works on both datasets without branching.
+
+## Scheduling algorithm
+
+`src/core/scheduler/Scheduler.ts` is a greedy scheduler. It orchestrates three helpers (`sortSamples`, `findCompatibleEquipments`, `findCompatibleTechnicians`) and delegates resource tracking to `ResourceTracker`.
+
+### Algorithm
+
+1. Sort samples by priority (`STAT > URGENT > ROUTINE`), then by arrival time.
+2. For each sample, gather candidate equipments (exact match first, `type` fallback second — see _Sample ↔ Equipment matching_).
+3. For each candidate equipment, gather compatible technicians and try to assign one:
+   - `start = max(sample.arrivalTime, technician.nextFreeTime, equipment.nextFreeSlot, technician.startTime)`
+   - `end = start + sample.analysisTime`
+   - If `end` exceeds `technician.endTime`, try the next technician. If no technician fits on this equipment, try the next candidate equipment.
+4. If no combination of equipment and technician fits, the sample is reported as unscheduled with the reason.
+
+### What is intentionally not handled yet
+
+- **Technician lunch breaks.** The `lunchBreak` field is loaded but not consulted. Technicians are considered available during their whole working window.
+- **Equipment maintenance windows.** `maintenanceWindow` is loaded but not consulted. Equipments are available from the start of the day.
+- **Efficiency coefficient.** `technician.efficiency` is loaded but analysis durations are not adjusted yet. The brief asks for `Math.round(duration / efficiency)`; this will be added as a later step.
+- **STAT preemption.** STAT samples are prioritized by the sort but do not interrupt a running analysis.
+
+These are the planned next steps and will be added incrementally.
 
 ## Design notes
 

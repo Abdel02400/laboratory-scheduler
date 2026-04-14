@@ -1,4 +1,4 @@
-import type { Range } from '@/core/types/number';
+import type { Range } from '@/core/types/primitives/number';
 
 export const ANALYSIS_TYPES = {
     NUMERATION_COMPLETE: 'Numération complète',

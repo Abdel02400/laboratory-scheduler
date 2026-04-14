@@ -1,5 +1,5 @@
-import type { Equipment as EquipmentDTO, EquipmentId } from '@/core/types/equipment';
-import type { Specialty } from '@/core/types/specialty';
+import type { Equipment as EquipmentDTO, EquipmentId } from '@/core/types/models/equipment';
+import type { Specialty } from '@/core/types/enums/specialty';
 
 export class Equipment {
     private readonly id: EquipmentId;

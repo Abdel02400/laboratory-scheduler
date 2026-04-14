@@ -1,7 +1,7 @@
-import type { AnalysisTime, AnalysisType } from '@/core/types/analysis';
-import type { PatientInfo } from '@/core/types/patient';
-import type { Priority } from '@/core/types/priority';
-import type { TimeString } from '@/core/types/time';
+import type { AnalysisTime, AnalysisType } from '@/core/types/enums/analysis';
+import type { PatientInfo } from '@/core/types/models/patient';
+import type { Priority } from '@/core/types/enums/priority';
+import type { TimeString } from '@/core/types/primitives/time';
 
 export type SampleId = string & { readonly __brand: 'SampleId' };
 

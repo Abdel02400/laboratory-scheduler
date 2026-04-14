@@ -1,4 +1,4 @@
-import type { Priority } from '@/core/types/priority';
+import type { Priority } from '@/core/types/enums/priority';
 
 export interface Constraints {
     maxProcessingTime: number;
