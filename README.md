@@ -43,6 +43,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - `pnpm format` — format all files with Prettier
 - `pnpm format:check` — check formatting without writing
 - `pnpm load --file=<path-to-json>` — load a lab input JSON file and instantiate the entities (prints a summary)
+- `pnpm resolve --file=<path-to-json>` — resolve each sample to a compatible equipment (prints the mapping)
 
 ### Loading a lab input
 
@@ -59,6 +60,31 @@ Expected output:
 ```
 Loaded 20 samples, 8 technicians, 5 equipment from data/samples.json
 ```
+
+## Sample ↔ Equipment matching
+
+Picking an equipment for a sample is handled by `findEquipmentForSample` in `src/core/scheduler/analysisTypeResolver.ts`. It applies a **two-step strategy**, which is the most important design decision of the project so far.
+
+### The two steps
+
+1. **Exact match on `analysisType`.** If any equipment declares the sample's `analysisType` verbatim in its `compatibleTypes` array, that equipment is selected. This is the preferred route — it reflects the equipment's explicit capabilities as described in the dataset.
+2. **Fallback on `type`.** If no equipment claims the analysis explicitly, the resolver falls back to matching `sample.type === equipment.type` (e.g. a `BLOOD` sample goes on a `BLOOD` equipment). The first equipment of the right type is picked.
+3. **Unscheduled.** If neither step finds a match, the sample is reported as having no compatible equipment.
+
+### Why this order
+
+The intermediate brief adds `compatibleTypes` on top of the existing `type` field. Exact-matching `analysisType` against `compatibleTypes` respects the brief's intent when the dataset is precise, but many samples in this dataset have enriched analysis names (`"Numération complète"`, `"Caryotype urgent"`, `"Sérologie HIV"`, etc.) that do not appear verbatim in any `compatibleTypes` list. A strict-only strategy would leave half of the samples unscheduled, which is not what the brief is trying to test.
+
+### Compatibility with the simple version of the brief
+
+The simple version of the brief uses a different data shape where equipment has no `compatibleTypes` and the three sample types (`BLOOD`, `URINE`, `TISSUE`) align 1:1 with the three equipment types. The step 2 fallback (`sample.type === equipment.type`) is exactly the rule described in the simple brief, so the same resolver works for both datasets without branching.
+
+### Tradeoffs on the current intermediate dataset
+
+- All 20 samples get matched (no unscheduled).
+- BLOOD samples whose `analysisType` is not in any `compatibleTypes` all route to `EQ001` (the only `BLOOD` equipment), which becomes a bottleneck.
+- `EQ004` (Immunology) ends up unused because no sample has `type: "IMMUNOLOGY"` — immunology-flavored analyses like `"Sérologie HIV"` have `type: "BLOOD"`, so they fall back to `EQ001` instead of going to `EQ004`.
+- This is accepted for now and will be revisited once the scheduler exposes actual throughput metrics.
 
 ## Design notes
 
