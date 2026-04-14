@@ -31,12 +31,19 @@ export class Scheduler {
     }
 
     private scheduleSample(sample: Sample, technicians: Technician[], equipments: Equipment[]): ScheduleEntry | UnscheduledEntry {
-        const candidates = findCompatibleEquipments(sample, equipments);
-        if (candidates.length === 0) {
+        const { primary, fallback } = findCompatibleEquipments(sample, equipments);
+        if (primary.length === 0) {
             return { sampleId: sample.getId(), reason: 'No compatible equipment' };
         }
 
-        for (const equipment of candidates) {
+        for (const equipment of primary) {
+            const entry = this.tryAssign(sample, equipment, technicians);
+            if (entry) {
+                return entry;
+            }
+        }
+
+        for (const equipment of fallback) {
             const entry = this.tryAssign(sample, equipment, technicians);
             if (entry) {
                 return entry;

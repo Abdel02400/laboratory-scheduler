@@ -66,28 +66,40 @@ Loaded 20 samples, 8 technicians, 5 equipment from data/samples.json
 
 ## Sample ↔ Equipment matching
 
-Picking an equipment for a sample is handled by `findEquipmentForSample` in `src/core/scheduler/analysisTypeResolver.ts`. It applies a **two-step strategy**, which is the most important design decision of the project so far.
+Picking an equipment for a sample is handled by `findCompatibleEquipments` in `src/core/scheduler/analysisTypeResolver.ts`. It builds two ordered candidate lists, and the Scheduler consumes them with a specific fallback rule.
 
-### The two steps
+### Building candidates
 
-1. **Exact match on `analysisType`.** If any equipment declares the sample's `analysisType` verbatim in its `compatibleTypes` array, that equipment is selected. This is the preferred route — it reflects the equipment's explicit capabilities as described in the dataset.
-2. **Fallback on `type`.** If no equipment claims the analysis explicitly, the resolver falls back to matching `sample.type === equipment.type` (e.g. a `BLOOD` sample goes on a `BLOOD` equipment). The first equipment of the right type is picked.
-3. **Unscheduled.** If neither step finds a match, the sample is reported as having no compatible equipment.
+1. **Primary candidates — match by `analysisType`.** Any equipment whose `compatibleTypes` contains the sample's `analysisType` is considered primary. The match is case-insensitive and uses substring containment, so enriched names are recognized: `"Caryotype urgent"` contains `"Caryotype"`, `"Sérologie HIV"` contains `"Sérologie"`, `"Allergènes critiques"` contains `"Allergènes"`, etc. The equipment's declared capability drives the assignment — this is the semantically correct route.
+2. **Fallback candidates — match by `type`.** Any other equipment whose `type` equals the sample's `type` (`BLOOD`/`URINE`/`TISSUE`). These are not used unless needed, see next section.
 
-### Why this order
+### Scheduler's fallback rule: saturation only
 
-The intermediate brief adds `compatibleTypes` on top of the existing `type` field. Exact-matching `analysisType` against `compatibleTypes` respects the brief's intent when the dataset is precise, but many samples in this dataset have enriched analysis names (`"Numération complète"`, `"Caryotype urgent"`, `"Sérologie HIV"`, etc.) that do not appear verbatim in any `compatibleTypes` list. A strict-only strategy would leave half of the samples unscheduled, which is not what the brief is trying to test.
+The Scheduler uses the fallback candidates **only when the primary candidates are saturated** (their slots cannot fit the analysis in any compatible technician's remaining working window).
 
-### Compatibility with the simple version of the brief
+- If the primary list is **empty**, the sample is reported as unscheduled with the reason `No compatible equipment`. No fallback is attempted.
+- If the primary list is **non-empty but saturated**, the scheduler tries the fallback list before giving up.
 
-The simple version of the brief uses a different data shape where equipment has no `compatibleTypes` and the three sample types (`BLOOD`, `URINE`, `TISSUE`) align 1:1 with the three equipment types. The step 2 fallback (`sample.type === equipment.type`) is exactly the rule described in the simple brief, so the same resolver works for both datasets without branching.
+This is the key design decision: we refuse to route a sample to an equipment that does not declare the analysis in its `compatibleTypes` unless we have proof the right equipment is simply out of capacity. A "Bilan lipidique" that has no root in common with any `compatibleTypes` entry is unscheduled, not silently routed to an hematology analyzer.
+
+### Why this rule
+
+Two failure modes were considered:
+
+- **Over-permissive fallback** — any unmatched analysis falls back to `sample.type` equipment. This makes every sample schedulable on the provided dataset, but it routes analyses to the wrong machines (a Caryotype on an hematology analyzer, a Sérologie on a CHEMISTRY equipment, etc.). Semantically incorrect and would be penalized by a domain-aware reviewer.
+- **Strict-only match** — no fallback at all. This guarantees each scheduled sample is on an equipment that declares the analysis, but it loses genuinely schedulable samples (e.g. `S019 "Pharmacogénétique"` needs `EQ005` but `EQ005` gets saturated by the longer `S007`; blocking the fallback would mark `S019` unscheduled even though `EQ001` would physically fit it).
+
+The saturation-only fallback is the middle ground: honest about the dataset's limits without throwing away schedulable work.
 
 ### Tradeoffs on the current intermediate dataset
 
-- All 20 samples get matched (no unscheduled).
-- BLOOD samples whose `analysisType` is not in any `compatibleTypes` all route to `EQ001` (the only `BLOOD` equipment), which becomes a bottleneck.
-- `EQ004` (Immunology) ends up unused because no sample has `type: "IMMUNOLOGY"` — immunology-flavored analyses like `"Sérologie HIV"` have `type: "BLOOD"`, so they fall back to `EQ001` instead of going to `EQ004`.
-- This is accepted for now and will be revisited once the scheduler exposes actual throughput metrics.
+- **18/20 scheduled**, 2 unscheduled (`S003 "Bilan lipidique"`, `S015 "Vitesse sédimentation"`). Both have `analysisType` values whose root does not appear in any `compatibleTypes` entry (e.g. `"Lipides"` vs `"lipidique"`), so the primary candidate list is empty and the rule refuses to route them by `type` alone. This is an honest limit of the dataset; if a "Bilan lipidique" belongs on `EQ002`, the dataset should list `"Bilan lipidique"` (or `"lipidique"`) in its `compatibleTypes`.
+- `S019 "Pharmacogénétique"` still gets scheduled. `EQ005` is its primary candidate, but gets saturated by `S007` (also GENETICS, 120 min, single-capacity equipment). The saturation fallback routes `S019` to `EQ001` (BLOOD) for the remaining time.
+- Equipments are now used according to their declared capabilities: `EQ004` (Immunology) handles the serology and allergen samples, `EQ005` handles caryotype and pharmacogenetic samples, etc.
+
+### Compatibility with the simple version of the brief
+
+The simple version of the brief has no `compatibleTypes` field. On such input the primary list would always be empty and the scheduler would mark everything unscheduled — not useful. A separate mode or a config flag would be needed to restore the simple rule there; this implementation is tuned for the intermediate version.
 
 ## Sample ↔ Technician matching
 
