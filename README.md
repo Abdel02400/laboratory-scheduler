@@ -133,12 +133,37 @@ Within the list of technicians compatible with a given sample, the Scheduler sor
 
 The reasoning is classic greedy heuristic: **use specialists when they are applicable, save generalists for the harder cases**. If a sample can be handled by both a specialist and a generalist, taking the specialist leaves the generalist available for a later sample that only the generalist could handle. On the intermediate dataset, this simple rule is what lets the scheduler reach 20/20 even with lunch breaks applied — without it, the two long GENETICS ROUTINE samples (S007 120 min, S019 90 min) would both compete for `TECH007` and one would fall off the end of the day.
 
-### What is intentionally not handled yet
+### What is intentionally not handled
 
-- **Equipment maintenance windows.** `maintenanceWindow` is loaded but not consulted. Equipments are available from the start of the day. In the current dataset the maintenance windows fall outside the lab opening hours (07:00–19:00), so ignoring them changes nothing on this input — but the support will be added for the general case.
-- **STAT preemption.** STAT samples are prioritized by the sort but do not interrupt a running analysis.
+- **Equipment maintenance windows.** `maintenanceWindow` is loaded but not consulted. In the current dataset every window falls outside the lab opening hours (07:00–19:00), so ignoring them changes nothing on this input.
+- **STAT preemption.** STAT samples are prioritized by the sort but do not interrupt a running analysis — the brief's intermediate version explicitly accepts this ("greedy sans backtracking").
 
-These are the planned next steps and will be added incrementally.
+## Metrics
+
+`src/core/metrics/MetricsCalculator.ts` computes the six metrics required by the brief from a `ScheduleEntry[]` plus the original samples, technicians and equipments.
+
+| Metric | Formula |
+|---|---|
+| `totalTime` | `max(endTime) − min(startTime)` across the schedule, in minutes. |
+| `averageWaitingTimeByPriority` | Per priority, the average of `startTime − arrivalTime`. |
+| `technicianUtilization` | Per technician, `sum(assigned durations) / totalTime × 100`. |
+| `equipmentUtilization` | Per equipment, `sum(assigned durations) / (capacity × totalTime) × 100` — the capacity factor accounts for parallel slots. |
+| `globalEfficiency` | Brief's official formula: `(Σ occupation_resource / number_of_resources / totalTime) × 100` where resources = technicians ∪ equipments. |
+| `priorityRespectRate` | Percentage of STAT samples whose start happened within 30 minutes of arrival (the brief's soft constraint). |
+| `parallelismRate` | Percentage of minutes during which more than one analysis is running simultaneously. |
+
+## Public API — `planifyLab`
+
+The brief requires a single public function that takes the input JSON and returns the schedule plus the metrics. `src/core/planifyLab.ts` exposes it:
+
+```ts
+import { planifyLab } from '@/core';
+
+const result = planifyLab(input);
+// { schedule: ScheduleEntry[], unscheduled: UnscheduledEntry[], metrics: Metrics }
+```
+
+`planifyLab` instantiates the entity classes from the DTOs, runs the Scheduler, then runs the MetricsCalculator on the resulting schedule.
 
 ## Design notes
 
