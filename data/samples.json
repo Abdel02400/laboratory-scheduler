@@ -1,0 +1,316 @@
+{
+    "laboratory": {
+        "name": "Laboratoire Central Médical",
+        "openingHours": "07:00-19:00",
+        "date": "2025-03-15"
+    },
+    "samples": [
+        {
+            "id": "S001",
+            "priority": "STAT",
+            "type": "BLOOD",
+            "analysisType": "Numération complète",
+            "analysisTime": 45,
+            "arrivalTime": "08:30",
+            "patientInfo": { "age": 67, "service": "Urgences", "diagnosis": "Suspicion hémorragie" }
+        },
+        {
+            "id": "S002",
+            "priority": "URGENT",
+            "type": "BLOOD",
+            "analysisType": "Bilan hépatique",
+            "analysisTime": 35,
+            "arrivalTime": "08:45",
+            "patientInfo": { "age": 42, "service": "Gastroentérologie", "diagnosis": "Hépatite virale" }
+        },
+        {
+            "id": "S003",
+            "priority": "ROUTINE",
+            "type": "BLOOD",
+            "analysisType": "Bilan lipidique",
+            "analysisTime": 30,
+            "arrivalTime": "09:00",
+            "patientInfo": { "age": 58, "service": "Médecine générale", "diagnosis": "Contrôle cholestérol" }
+        },
+        {
+            "id": "S004",
+            "priority": "ROUTINE",
+            "type": "BLOOD",
+            "analysisType": "Hémogramme standard",
+            "analysisTime": 25,
+            "arrivalTime": "09:15",
+            "patientInfo": { "age": 35, "service": "Médecine du travail", "diagnosis": "Visite systématique" }
+        },
+        {
+            "id": "S005",
+            "priority": "URGENT",
+            "type": "BLOOD",
+            "analysisType": "Coagulation",
+            "analysisTime": 25,
+            "arrivalTime": "09:30",
+            "patientInfo": { "age": 73, "service": "Chirurgie", "diagnosis": "Pré-opératoire" }
+        },
+        {
+            "id": "S006",
+            "priority": "ROUTINE",
+            "type": "BLOOD",
+            "analysisType": "Vaccination contrôle",
+            "analysisTime": 35,
+            "arrivalTime": "10:00",
+            "patientInfo": { "age": 22, "service": "Médecine préventive", "diagnosis": "Titre anticorps" }
+        },
+        {
+            "id": "S007",
+            "priority": "ROUTINE",
+            "type": "BLOOD",
+            "analysisType": "Conseil génétique",
+            "analysisTime": 120,
+            "arrivalTime": "10:30",
+            "patientInfo": { "age": 28, "service": "Consultation génétique", "diagnosis": "Antécédents familiaux" }
+        },
+        {
+            "id": "S008",
+            "priority": "STAT",
+            "type": "BLOOD",
+            "analysisType": "Troponine",
+            "analysisTime": 30,
+            "arrivalTime": "09:15",
+            "patientInfo": { "age": 55, "service": "Cardiologie", "diagnosis": "Infarctus suspecté" }
+        },
+        {
+            "id": "S009",
+            "priority": "URGENT",
+            "type": "URINE",
+            "analysisType": "ECBU",
+            "analysisTime": 50,
+            "arrivalTime": "10:15",
+            "patientInfo": { "age": 29, "service": "Urologie", "diagnosis": "Infection urinaire" }
+        },
+        {
+            "id": "S010",
+            "priority": "ROUTINE",
+            "type": "TISSUE",
+            "analysisType": "Prélèvement gorge",
+            "analysisTime": 45,
+            "arrivalTime": "11:15",
+            "patientInfo": { "age": 19, "service": "ORL", "diagnosis": "Angine récidivante" }
+        },
+        {
+            "id": "S011",
+            "priority": "URGENT",
+            "type": "BLOOD",
+            "analysisType": "Caryotype urgent",
+            "analysisTime": 90,
+            "arrivalTime": "11:00",
+            "patientInfo": { "age": 32, "service": "Génétique médicale", "diagnosis": "Syndrome chromosomique" }
+        },
+        {
+            "id": "S012",
+            "priority": "STAT",
+            "type": "BLOOD",
+            "analysisType": "Hémoculture urgente",
+            "analysisTime": 60,
+            "arrivalTime": "10:45",
+            "patientInfo": { "age": 34, "service": "Réanimation", "diagnosis": "Sepsis sévère" }
+        },
+        {
+            "id": "S013",
+            "priority": "ROUTINE",
+            "type": "BLOOD",
+            "analysisType": "HbA1c",
+            "analysisTime": 25,
+            "arrivalTime": "12:00",
+            "patientInfo": { "age": 52, "service": "Endocrinologie", "diagnosis": "Diabète type 2" }
+        },
+        {
+            "id": "S014",
+            "priority": "URGENT",
+            "type": "BLOOD",
+            "analysisType": "Sérologie HIV",
+            "analysisTime": 55,
+            "arrivalTime": "11:45",
+            "patientInfo": { "age": 26, "service": "Infectiologie", "diagnosis": "Exposition VIH" }
+        },
+        {
+            "id": "S015",
+            "priority": "ROUTINE",
+            "type": "BLOOD",
+            "analysisType": "Vitesse sédimentation",
+            "analysisTime": 60,
+            "arrivalTime": "13:00",
+            "patientInfo": { "age": 65, "service": "Rhumatologie", "diagnosis": "Inflammation chronique" }
+        },
+        {
+            "id": "S016",
+            "priority": "URGENT",
+            "type": "BLOOD",
+            "analysisType": "Frottis sanguin",
+            "analysisTime": 40,
+            "arrivalTime": "12:30",
+            "patientInfo": { "age": 45, "service": "Hématologie", "diagnosis": "Leucémie suspectée" }
+        },
+        {
+            "id": "S017",
+            "priority": "STAT",
+            "type": "BLOOD",
+            "analysisType": "Allergènes critiques",
+            "analysisTime": 40,
+            "arrivalTime": "13:20",
+            "patientInfo": { "age": 8, "service": "Pédiatrie", "diagnosis": "Choc anaphylactique" }
+        },
+        {
+            "id": "S018",
+            "priority": "URGENT",
+            "type": "BLOOD",
+            "analysisType": "Électrolytes",
+            "analysisTime": 20,
+            "arrivalTime": "14:15",
+            "patientInfo": { "age": 81, "service": "Gériatrie", "diagnosis": "Déshydratation" }
+        },
+        {
+            "id": "S019",
+            "priority": "ROUTINE",
+            "type": "BLOOD",
+            "analysisType": "Pharmacogénétique",
+            "analysisTime": 90,
+            "arrivalTime": "14:45",
+            "patientInfo": { "age": 47, "service": "Oncologie", "diagnosis": "Adaptation thérapie" }
+        },
+        {
+            "id": "S020",
+            "priority": "URGENT",
+            "type": "TISSUE",
+            "analysisType": "Parasitologie",
+            "analysisTime": 65,
+            "arrivalTime": "15:30",
+            "patientInfo": { "age": 12, "service": "Pédiatrie", "diagnosis": "Parasitose intestinale" }
+        }
+    ],
+    "technicians": [
+        {
+            "id": "TECH001",
+            "name": "Dr. Marie Dubois",
+            "specialty": ["BLOOD", "CHEMISTRY"],
+            "efficiency": 1.2,
+            "startTime": "07:30",
+            "endTime": "16:30",
+            "lunchBreak": "12:30-13:30"
+        },
+        {
+            "id": "TECH002",
+            "name": "Jean-Pierre Martin",
+            "specialty": ["MICROBIOLOGY", "IMMUNOLOGY"],
+            "efficiency": 1.1,
+            "startTime": "08:00",
+            "endTime": "17:00",
+            "lunchBreak": "13:00-14:00"
+        },
+        {
+            "id": "TECH003",
+            "name": "Sophie Bernard",
+            "specialty": ["CHEMISTRY", "IMMUNOLOGY"],
+            "efficiency": 1.0,
+            "startTime": "08:00",
+            "endTime": "17:00",
+            "lunchBreak": "12:00-13:00"
+        },
+        {
+            "id": "TECH004",
+            "name": "Lucas Petit",
+            "specialty": ["BLOOD", "GENETICS"],
+            "efficiency": 0.95,
+            "startTime": "09:00",
+            "endTime": "18:00",
+            "lunchBreak": "13:00-14:00"
+        },
+        {
+            "id": "TECH005",
+            "name": "Emma Rousseau",
+            "specialty": ["MICROBIOLOGY"],
+            "efficiency": 1.0,
+            "startTime": "07:00",
+            "endTime": "16:00",
+            "lunchBreak": "12:30-13:30"
+        },
+        {
+            "id": "TECH006",
+            "name": "Thomas Moreau",
+            "specialty": ["GENETICS", "IMMUNOLOGY"],
+            "efficiency": 0.9,
+            "startTime": "09:30",
+            "endTime": "18:30",
+            "lunchBreak": "13:30-14:30"
+        },
+        {
+            "id": "TECH007",
+            "name": "Camille Leroy",
+            "specialty": ["CHEMISTRY", "BLOOD", "IMMUNOLOGY"],
+            "efficiency": 1.05,
+            "startTime": "08:30",
+            "endTime": "17:30",
+            "lunchBreak": "12:00-13:00"
+        },
+        {
+            "id": "TECH008",
+            "name": "Antoine Garnier",
+            "specialty": ["BLOOD", "MICROBIOLOGY"],
+            "efficiency": 0.85,
+            "startTime": "10:00",
+            "endTime": "19:00",
+            "lunchBreak": "14:00-15:00"
+        }
+    ],
+    "equipment": [
+        {
+            "id": "EQ001",
+            "name": "Analyseur Hématologie XN-3000",
+            "type": "BLOOD",
+            "compatibleTypes": ["Hémogramme", "Numération", "Coagulation", "Frottis"],
+            "capacity": 2,
+            "maintenanceWindow": "06:00-07:00",
+            "cleaningTime": 10
+        },
+        {
+            "id": "EQ002",
+            "name": "Automate Biochimie Cobas 8000",
+            "type": "CHEMISTRY",
+            "compatibleTypes": ["Bilan hépatique", "Lipides", "Électrolytes", "Troponine", "HbA1c"],
+            "capacity": 3,
+            "maintenanceWindow": "06:30-07:30",
+            "cleaningTime": 15
+        },
+        {
+            "id": "EQ003",
+            "name": "Station Microbiologie Vitek MS",
+            "type": "MICROBIOLOGY",
+            "compatibleTypes": ["ECBU", "Hémoculture", "Parasitologie", "Prélèvement gorge"],
+            "capacity": 2,
+            "maintenanceWindow": "07:00-08:00",
+            "cleaningTime": 20
+        },
+        {
+            "id": "EQ004",
+            "name": "Système Immunologie Liaison XL",
+            "type": "IMMUNOLOGY",
+            "compatibleTypes": ["Sérologie", "Allergènes", "Vaccination", "Titre anticorps"],
+            "capacity": 2,
+            "maintenanceWindow": "05:30-06:30",
+            "cleaningTime": 12
+        },
+        {
+            "id": "EQ005",
+            "name": "Séquenceur Génétique NextSeq",
+            "type": "GENETICS",
+            "compatibleTypes": ["Caryotype", "Conseil génétique", "Pharmacogénétique"],
+            "capacity": 1,
+            "maintenanceWindow": "19:00-20:00",
+            "cleaningTime": 30
+        }
+    ],
+    "constraints": {
+        "maxProcessingTime": 720,
+        "priorityRules": ["STAT", "URGENT", "ROUTINE"],
+        "contaminationPrevention": true,
+        "parallelProcessing": true
+    }
+}
