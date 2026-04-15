@@ -47,6 +47,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - `pnpm sort --file=<path-to-json>` — sort samples by priority then arrival time (prints the sorted list)
 - `pnpm match --file=<path-to-json>` — combine sort + equipment resolver + technician matching (prints each sample's candidates)
 - `pnpm schedule --file=<path-to-json> [--output=<path-to-write>]` — run the full greedy scheduler. By default the full result JSON is printed to stdout; with `--output` (or `-o`) it is written to the given path instead. The shape of this JSON matches the brief's expected output (see _Public API — planifyLab_ below).
+- `pnpm test` — run the Jest test suite
+- `pnpm test:watch` — run Jest in watch mode during development
 
 ### Loading a lab input
 
@@ -188,6 +190,38 @@ const result = planifyLab(input);
 - `metadata.lunchBreaks` lists each technician's lunch window with planned and actual times (always identical for now), and `metadata.constraintsApplied` enumerates the constraints actually honored by the scheduler (priority management, specialization matching, lunch breaks, equipment compatibility, cleaning delays, efficiency coefficients, parallelism optimization — `maintenance_avoidance` is absent, consistent with the "not handled" section above).
 
 An example output generated on `data/samples.json` is committed as `data/output-example.json` (required deliverable). It can be regenerated at any time with `pnpm schedule --file=data/samples.json --output=data/output-example.json`.
+
+## Tests
+
+The suite is written with **Jest + ts-jest** and lives under `tests/`, mirroring the source tree. Run it with `pnpm test`. A dedicated `tsconfig.jest.json` isolates the commonjs/node module settings Jest needs from the main Next.js `tsconfig.json`.
+
+### Coverage
+
+- **`tests/utils/time.test.ts`** — `parseTime`, `formatTime`, `parseRange`, `overlaps`.
+- **`tests/entities/`** — `Sample` (getters, `arrivalMinutes`, `isStat`, `isUrgent`), `Technician` (`canHandle`, `adjustedDuration` with `Math.round`, `adjustForLunch`), `Equipment` (getters, `compatibleTypes`).
+- **`tests/scheduler/sortSamples.test.ts`** — priority ordering (STAT > URGENT > ROUTINE), arrival-time tie-break, no-mutation guarantee.
+- **`tests/scheduler/analysisTypeResolver.test.ts`** — exact match, substring match (enriched names like `"Caryotype urgent"`), case-insensitivity, the `type` fallback list, the empty-primary case.
+- **`tests/scheduler/findTechnicians.test.ts`** — step 1 `sample.type` match, step 2 `equipment.type` fallback, the no-match case.
+- **`tests/scheduler/Scheduler.test.ts`** — single-sample happy path, STAT-first ordering, efficiency coefficient applied to duration, lunch-break push, cleaning time between two samples on the same slot, unscheduled when no compatible equipment exists.
+- **`tests/metrics/MetricsCalculator.test.ts`** — `totalTime` across the schedule, average waiting time per priority, STAT 30-minute priority-respect rate.
+- **`tests/planifyLab.test.ts`** — golden / integration test on `data/samples.json`: top-level output shape, `laboratory` metadata, 18/20 scheduled + `S003`/`S015` unscheduled, `HH:MM` time formatting, correct equipment routing for sensitive cases (`Caryotype urgent → EQ005`, `Sérologie HIV → EQ004`), `conflicts: 0`, presence of key constraint flags in `metadata.constraintsApplied`.
+
+### Shared factories
+
+`tests/helpers/factories.ts` exposes two sets of factories:
+
+- `makeSample`, `makeTechnician`, `makeEquipment` return **DTOs** with sane defaults (used by integration-style tests like `planifyLab`).
+- `makeSampleEntity`, `makeTechnicianEntity`, `makeEquipmentEntity` return the **entity classes** already constructed from those DTOs, so unit tests on class behavior are one line instead of `new Sample(makeSample(...))`.
+
+Each factory takes a `Partial<...Override>` where the override type widens the branded IDs (`SampleId`/`TechnicianId`/`EquipmentId`) and narrow unions (`AnalysisType`, `Priority`, `TimeString`, `Range<...>`) back to plain `string | number`. Tests can pass `'S042'`, `'Numération'`, `42` directly without fighting the brands; the factory casts to the strict DTO internally before handing it to the entity constructor.
+
+### TypeScript configuration split
+
+Three tsconfig files coexist to keep Next.js, the Jest runner, and the IDE happy:
+
+- `tsconfig.json` — main Next.js config, excludes `tests/` so the production build is never weighed down by test files.
+- `tsconfig.jest.json` — extends the main config but switches to `commonjs` / `node` for Jest and declares `types: ["node", "jest"]` so globals like `describe`, `it`, `expect` and the `node:*` imports resolve.
+- `tests/tsconfig.json` — tiny file that extends `tsconfig.jest.json` so the VS Code TypeScript server picks up the right config when opening a test file (otherwise the exclusion in the main tsconfig leaves test files without a resolver).
 
 ## Design notes
 
