@@ -16,7 +16,7 @@ export function formatOutput(input: LabInput, result: ScheduleResult, metrics: M
         laboratory: formatLaboratory(input),
         schedule: formatSchedule(result.schedule, samples, technicians),
         unscheduled: formatUnscheduled(result.unscheduled),
-        metrics: formatMetrics(metrics, result.schedule),
+        metrics: formatMetrics(metrics, result.schedule, result.lunchInterruptions),
         metadata: formatMetadata(technicians),
     };
 }
@@ -61,7 +61,7 @@ function formatUnscheduled(entries: UnscheduledEntry[]): UnscheduledEntryOutput[
     return entries.map((e) => ({ sampleId: e.sampleId, reason: e.reason }));
 }
 
-function formatMetrics(metrics: Metrics, schedule: ScheduleEntry[]): MetricsOutput {
+function formatMetrics(metrics: Metrics, schedule: ScheduleEntry[], lunchInterruptions: number): MetricsOutput {
     return {
         totalTime: metrics.totalTime,
         efficiency: round1(metrics.globalEfficiency),
@@ -70,7 +70,7 @@ function formatMetrics(metrics: Metrics, schedule: ScheduleEntry[]): MetricsOutp
         technicianUtilization: round1(averageOfRecord(metrics.technicianUtilization)),
         priorityRespectRate: round1(metrics.priorityRespectRate),
         parallelAnalyses: peakConcurrent(schedule),
-        lunchInterruptions: 0,
+        lunchInterruptions,
     };
 }
 

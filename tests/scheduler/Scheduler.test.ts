@@ -32,13 +32,23 @@ describe('Scheduler', () => {
         expect(schedule[0].endTime - schedule[0].startTime).toBe(50);
     });
 
-    it('pushes the start past the lunch break when the analysis window would overlap it', () => {
-        const samples = [makeSampleEntity({ arrivalTime: '11:45', analysisTime: 45 })];
+    it('pushes a non-STAT analysis start past the lunch break when the window would overlap', () => {
+        const samples = [makeSampleEntity({ priority: 'URGENT', arrivalTime: '11:45', analysisTime: 45 })];
         const techs = [makeTechnicianEntity({ efficiency: 1.0, startTime: '08:00', endTime: '17:00', lunchBreak: '12:00-13:00' })];
         const equipments = [makeEquipmentEntity()];
 
         const { schedule } = new Scheduler().schedule(samples, techs, equipments);
         expect(schedule[0].startTime).toBe(13 * 60);
+    });
+
+    it('lets a STAT analysis interrupt the lunch and tracks the interruption', () => {
+        const samples = [makeSampleEntity({ priority: 'STAT', arrivalTime: '12:15', analysisTime: 30 })];
+        const techs = [makeTechnicianEntity({ efficiency: 1.0, startTime: '08:00', endTime: '17:00', lunchBreak: '12:00-13:00' })];
+        const equipments = [makeEquipmentEntity()];
+
+        const result = new Scheduler().schedule(samples, techs, equipments);
+        expect(result.schedule[0].startTime).toBe(12 * 60 + 15);
+        expect(result.lunchInterruptions).toBe(1);
     });
 
     it('applies the cleaning time between two samples on the same equipment slot', () => {

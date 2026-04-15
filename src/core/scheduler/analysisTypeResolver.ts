@@ -15,6 +15,13 @@ function matchesAnalysis(analysisType: string, compatibleTypes: string[]): boole
 }
 
 export function findCompatibleEquipments(sample: Sample, equipments: Equipment[]): EquipmentCandidates {
+    const hasCompatibleTypes = equipments.some((eq) => eq.getCompatibleTypes().length > 0);
+
+    if (!hasCompatibleTypes) {
+        const byType = equipments.filter((eq) => eq.getType() === sample.getType());
+        return { primary: byType, fallback: [] };
+    }
+
     const primary = equipments.filter((eq) => matchesAnalysis(sample.getAnalysisType(), eq.getCompatibleTypes()));
     const fallback = equipments.filter((eq) => eq.getType() === sample.getType() && !primary.includes(eq));
     return { primary, fallback };

@@ -20,6 +20,7 @@ export interface UnscheduledEntry {
 export interface ScheduleResult {
     schedule: ScheduleEntry[];
     unscheduled: UnscheduledEntry[];
+    lunchInterruptions: number;
 }
 
 export interface ScheduleEntryOutput {

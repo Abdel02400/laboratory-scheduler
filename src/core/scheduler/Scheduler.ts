@@ -11,9 +11,11 @@ import { sortSamples } from './sortSamples';
 
 export class Scheduler {
     private readonly tracker = new ResourceTracker();
+    private lunchInterruptions = 0;
 
     schedule(samples: Sample[], technicians: Technician[], equipments: Equipment[]): ScheduleResult {
         this.tracker.init(technicians, equipments);
+        this.lunchInterruptions = 0;
 
         const schedule: ScheduleEntry[] = [];
         const unscheduled: UnscheduledEntry[] = [];
@@ -27,7 +29,7 @@ export class Scheduler {
             }
         }
 
-        return { schedule, unscheduled };
+        return { schedule, unscheduled, lunchInterruptions: this.lunchInterruptions };
     }
 
     private scheduleSample(sample: Sample, technicians: Technician[], equipments: Equipment[]): ScheduleEntry | UnscheduledEntry {
@@ -74,7 +76,14 @@ export class Scheduler {
         for (const tech of sorted) {
             const earliest = Math.max(sample.arrivalMinutes(), this.tracker.getTechReady(tech.getId()), slot.readyAt, parseTime(tech.getStartTime()));
             const duration = tech.adjustedDuration(sample.getAnalysisTime());
-            const afterLunch = tech.adjustForLunch(earliest, duration);
+            let afterLunch = earliest;
+            if (sample.isStat()) {
+                if (tech.adjustForLunch(earliest, duration) !== earliest) {
+                    this.lunchInterruptions += 1;
+                }
+            } else {
+                afterLunch = tech.adjustForLunch(earliest, duration);
+            }
             const start = equipment.adjustForMaintenance(afterLunch, duration);
             const end = start + duration;
 

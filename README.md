@@ -101,7 +101,7 @@ The saturation-only fallback is the middle ground: honest about the dataset's li
 
 ### Compatibility with the simple version of the brief
 
-The simple version of the brief has no `compatibleTypes` field. On such input the primary list would always be empty and the scheduler would mark everything unscheduled — not useful. A separate mode or a config flag would be needed to restore the simple rule there; this implementation is tuned for the intermediate version.
+The resolver auto-detects the simple mode: if **no equipment in the input declares any `compatibleTypes`**, it bypasses the primary/fallback split and directly returns equipments whose `type` equals `sample.type` (the matching rule described in the simple brief). No config flag is needed; the same `planifyLab` works for both dataset shapes.
 
 ## Sample ↔ Technician matching
 
@@ -136,8 +136,8 @@ In the simple version, `technician.specialty` and `sample.type` share the same v
 3. For each candidate equipment, gather compatible technicians, sort them by the rule below, then try to assign one:
    - `earliest = max(sample.arrivalTime, technician.nextFreeTime, equipment.nextFreeSlot, technician.startTime)`
    - `duration = Math.round(sample.analysisTime / technician.efficiency)` — the brief's rounding rule, encapsulated in `Technician.adjustedDuration`.
-   - `afterLunch = technician.adjustForLunch(earliest, duration)` — if the analysis window overlaps the technician's lunch break, the start is pushed to the end of the lunch.
-   - `start = equipment.adjustForMaintenance(afterLunch, duration)` — same rule against the equipment's `maintenanceWindow`.
+   - `afterLunch = technician.adjustForLunch(earliest, duration)` for non-STAT samples. For STAT samples the lunch is **not** respected: the start stays at `earliest` and `lunchInterruptions` is incremented when the analysis window overlaps the tech's lunch. This matches the brief's example 3 where a STAT interrupts an ongoing lunch break.
+   - `start = equipment.adjustForMaintenance(afterLunch, duration)` — same overlap rule against the equipment's `maintenanceWindow`.
    - `end = start + duration`
    - If `end` exceeds `technician.endTime`, try the next technician. If no technician fits on this equipment, try the next candidate equipment.
 4. If no combination of equipment and technician fits, the sample is reported as unscheduled with the reason.
@@ -150,7 +150,7 @@ The reasoning is classic greedy heuristic: **use specialists when they are appli
 
 ### What is intentionally not handled
 
-- **STAT preemption.** STAT samples are prioritized by the sort but do not interrupt a running analysis — the brief's intermediate version explicitly accepts this ("greedy sans backtracking").
+- **STAT preemption of a running analysis.** STAT samples are prioritized by the sort and interrupt lunches, but they do not stop a running URGENT/ROUTINE analysis on the fly — the brief's intermediate version explicitly accepts this ("greedy sans backtracking").
 
 ## Metrics
 

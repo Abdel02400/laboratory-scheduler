@@ -34,4 +34,11 @@ describe('findCompatibleEquipments', () => {
         expect(primary).toEqual([]);
         expect(fallback.map((e) => e.getId())).toEqual(['EQ001']);
     });
+
+    it('simple-mode: when no equipment declares compatibleTypes, matches purely by sample.type === equipment.type', () => {
+        const simpleEquipments = [makeEquipmentEntity({ id: 'E_BLOOD', type: 'BLOOD', compatibleTypes: [] }), makeEquipmentEntity({ id: 'E_URINE', type: 'URINE' as never, compatibleTypes: [] }), makeEquipmentEntity({ id: 'E_TISSUE', type: 'TISSUE' as never, compatibleTypes: [] })];
+        const { primary, fallback } = findCompatibleEquipments(makeSampleEntity({ analysisType: 'Anything', type: 'URINE' }), simpleEquipments);
+        expect(primary.map((e) => e.getId())).toEqual(['E_URINE']);
+        expect(fallback).toEqual([]);
+    });
 });
