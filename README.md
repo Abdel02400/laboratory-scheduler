@@ -46,7 +46,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - `pnpm resolve --file=<path-to-json>` — resolve each sample to a compatible equipment (prints the mapping)
 - `pnpm sort --file=<path-to-json>` — sort samples by priority then arrival time (prints the sorted list)
 - `pnpm match --file=<path-to-json>` — combine sort + equipment resolver + technician matching (prints each sample's candidates)
-- `pnpm schedule --file=<path-to-json>` — run the full greedy scheduler and print the resulting schedule
+- `pnpm schedule --file=<path-to-json> [--output=<path-to-write>]` — run the full greedy scheduler. By default the full result JSON is printed to stdout; with `--output` (or `-o`) it is written to the given path instead. The shape of this JSON matches the brief's expected output (see _Public API — planifyLab_ below).
 
 ### Loading a lab input
 
@@ -166,16 +166,28 @@ The reasoning is classic greedy heuristic: **use specialists when they are appli
 
 ## Public API — `planifyLab`
 
-The brief requires a single public function that takes the input JSON and returns the schedule plus the metrics. `src/core/planifyLab.ts` exposes it:
+The brief requires a single public function that takes the input JSON and returns the schedule plus the metrics. `src/core/planifyLab.ts` exposes it, and the returned shape matches the brief's expected output format.
 
 ```ts
 import { planifyLab } from '@/core';
 
 const result = planifyLab(input);
-// { schedule: ScheduleEntry[], unscheduled: UnscheduledEntry[], metrics: Metrics }
+// {
+//   laboratory: { date, processingDate, totalSamples, algorithmVersion },
+//   schedule: ScheduleEntryOutput[],
+//   unscheduled: UnscheduledEntryOutput[],
+//   metrics: MetricsOutput,
+//   metadata: { lunchBreaks, constraintsApplied },
+// }
 ```
 
-`planifyLab` instantiates the entity classes from the DTOs, runs the Scheduler, then runs the MetricsCalculator on the resulting schedule.
+`planifyLab` instantiates the entity classes from the DTOs, runs the Scheduler, runs the MetricsCalculator on the resulting schedule, then passes everything to `formatOutput` (`src/core/output/formatter.ts`) which produces the brief-aligned shape:
+
+- Each `ScheduleEntryOutput` exposes the times as `"HH:MM"` strings, the actual `duration` in minutes, the sample's `analysisType`, the technician's `efficiency` coefficient, a `lunchBreak` field (currently always `null` as lunch preemption is not implemented) and `cleaningRequired: true` for every entry that is not the first on its equipment.
+- `MetricsOutput` carries the brief's names: `efficiency` (the global formula), `conflicts` (always `0` by construction), `averageWaitTime` per priority rounded to integers, `technicianUtilization` averaged across technicians, `priorityRespectRate`, `parallelAnalyses` (peak number of concurrent analyses) and `lunchInterruptions` (stays at `0` since preemption is not implemented).
+- `metadata.lunchBreaks` lists each technician's lunch window with planned and actual times (always identical for now), and `metadata.constraintsApplied` enumerates the constraints actually honored by the scheduler (priority management, specialization matching, lunch breaks, equipment compatibility, cleaning delays, efficiency coefficients, parallelism optimization — `maintenance_avoidance` is absent, consistent with the "not handled" section above).
+
+An example output generated on `data/samples.json` is committed as `data/output-example.json` (required deliverable). It can be regenerated at any time with `pnpm schedule --file=data/samples.json --output=data/output-example.json`.
 
 ## Design notes
 

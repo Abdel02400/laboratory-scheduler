@@ -21,3 +21,22 @@ export interface ScheduleResult {
     schedule: ScheduleEntry[];
     unscheduled: UnscheduledEntry[];
 }
+
+export interface ScheduleEntryOutput {
+    sampleId: string;
+    priority: Priority;
+    technicianId: string;
+    equipmentId: string;
+    startTime: string;
+    endTime: string;
+    duration: number;
+    analysisType: string;
+    efficiency: number;
+    lunchBreak: string | null;
+    cleaningRequired: boolean;
+}
+
+export interface UnscheduledEntryOutput {
+    sampleId: string;
+    reason: string;
+}

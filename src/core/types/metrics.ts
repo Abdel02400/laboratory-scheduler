@@ -11,3 +11,14 @@ export interface Metrics {
     priorityRespectRate: number;
     parallelismRate: number;
 }
+
+export interface MetricsOutput {
+    totalTime: number;
+    efficiency: number;
+    conflicts: number;
+    averageWaitTime: Record<Priority, number>;
+    technicianUtilization: number;
+    priorityRespectRate: number;
+    parallelAnalyses: number;
+    lunchInterruptions: number;
+}
