@@ -234,3 +234,8 @@ A few deliberate choices made during the project:
 - **Template literal type for time strings.** `TimeString` enforces the `HH:MM` format (00:00–23:59) at compile time.
 - **Generic `Range<Min, Max>` utility.** Age and analysis time are constrained to their valid ranges at the type level via a recursive `Enumerate` helper, so invalid literals fail to compile.
 
+## Possible improvements
+
+- **Unify the technician specialty key.** The simple version uses `speciality` (singular, single value) and the intermediate version uses `specialty` (plural, array). Currently both keys are accepted and the runtime validator picks whichever is present. A cleaner design would expose a single key (ex: `specialty: Specialty | Specialty[]`) that tolerates both shapes and let the loader normalize to an array.
+- **Align `analysisType` and `compatibleTypes` vocabularies.** In the dataset, `sample.analysisType` uses long form (e.g. `"Numération complète"`, `"Caryotype urgent"`) while `equipment.compatibleTypes` uses short form (`"Numération"`, `"Caryotype"`). They describe the same medical analyses but with two distinct vocabularies, which forced the resolver into substring matching with edge cases. As a consequence two strict const enums were intentionally created in v2 (`AnalysisType` for the 20 long forms, `CompatibleType` for the 20 short forms) — the duplication is on purpose and reflects the JSON inconsistency. A single shared enum (one canonical form on both sides of the JSON) would remove the substring fallback entirely and simplify the resolver.
+
