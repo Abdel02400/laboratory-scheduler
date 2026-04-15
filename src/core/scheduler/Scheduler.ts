@@ -74,7 +74,8 @@ export class Scheduler {
         for (const tech of sorted) {
             const earliest = Math.max(sample.arrivalMinutes(), this.tracker.getTechReady(tech.getId()), slot.readyAt, parseTime(tech.getStartTime()));
             const duration = tech.adjustedDuration(sample.getAnalysisTime());
-            const start = tech.adjustForLunch(earliest, duration);
+            const afterLunch = tech.adjustForLunch(earliest, duration);
+            const start = equipment.adjustForMaintenance(afterLunch, duration);
             const end = start + duration;
 
             if (end > parseTime(tech.getEndTime())) {

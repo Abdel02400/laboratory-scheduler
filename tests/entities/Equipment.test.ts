@@ -13,4 +13,11 @@ describe('Equipment', () => {
         const eq = makeEquipmentEntity({ compatibleTypes: ['Caryotype', 'Conseil génétique'] });
         expect(eq.getCompatibleTypes()).toEqual(['Caryotype', 'Conseil génétique']);
     });
+
+    it('adjustForMaintenance pushes the start past maintenance when the window overlaps', () => {
+        const eq = makeEquipmentEntity({ maintenanceWindow: '12:00-13:00' });
+        expect(eq.adjustForMaintenance(690, 60)).toBe(780);
+        expect(eq.adjustForMaintenance(600, 30)).toBe(600);
+        expect(eq.adjustForMaintenance(800, 30)).toBe(800);
+    });
 });

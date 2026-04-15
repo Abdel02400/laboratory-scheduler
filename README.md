@@ -136,7 +136,8 @@ In the simple version, `technician.specialty` and `sample.type` share the same v
 3. For each candidate equipment, gather compatible technicians, sort them by the rule below, then try to assign one:
    - `earliest = max(sample.arrivalTime, technician.nextFreeTime, equipment.nextFreeSlot, technician.startTime)`
    - `duration = Math.round(sample.analysisTime / technician.efficiency)` — the brief's rounding rule, encapsulated in `Technician.adjustedDuration`.
-   - `start = technician.adjustForLunch(earliest, duration)` — if the analysis window overlaps the technician's lunch break, the start is pushed to the end of the lunch.
+   - `afterLunch = technician.adjustForLunch(earliest, duration)` — if the analysis window overlaps the technician's lunch break, the start is pushed to the end of the lunch.
+   - `start = equipment.adjustForMaintenance(afterLunch, duration)` — same rule against the equipment's `maintenanceWindow`.
    - `end = start + duration`
    - If `end` exceeds `technician.endTime`, try the next technician. If no technician fits on this equipment, try the next candidate equipment.
 4. If no combination of equipment and technician fits, the sample is reported as unscheduled with the reason.
@@ -149,7 +150,6 @@ The reasoning is classic greedy heuristic: **use specialists when they are appli
 
 ### What is intentionally not handled
 
-- **Equipment maintenance windows.** `maintenanceWindow` is loaded but not consulted. In the current dataset every window falls outside the lab opening hours (07:00–19:00), so ignoring them changes nothing on this input.
 - **STAT preemption.** STAT samples are prioritized by the sort but do not interrupt a running analysis — the brief's intermediate version explicitly accepts this ("greedy sans backtracking").
 
 ## Metrics

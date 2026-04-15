@@ -1,5 +1,6 @@
 import type { Equipment as EquipmentDTO, EquipmentId } from '@/core/types/models/equipment';
 import type { Specialty } from '@/core/types/enums/specialty';
+import { overlaps, parseRange, type TimeRange } from '@/core/utils/time';
 
 export class Equipment {
     private readonly id: EquipmentId;
@@ -8,6 +9,7 @@ export class Equipment {
     private readonly compatibleTypes: string[];
     private readonly capacity: number;
     private readonly maintenanceWindow: string;
+    private readonly maintenance: TimeRange;
     private readonly cleaningTime: number;
 
     constructor(dto: EquipmentDTO) {
@@ -17,6 +19,7 @@ export class Equipment {
         this.compatibleTypes = dto.compatibleTypes;
         this.capacity = dto.capacity;
         this.maintenanceWindow = dto.maintenanceWindow;
+        this.maintenance = parseRange(dto.maintenanceWindow);
         this.cleaningTime = dto.cleaningTime;
     }
 
@@ -46,5 +49,10 @@ export class Equipment {
 
     getCleaningTime(): number {
         return this.cleaningTime;
+    }
+
+    adjustForMaintenance(start: number, duration: number): number {
+        const window = { start, end: start + duration };
+        return overlaps(window, this.maintenance) ? this.maintenance.end : start;
     }
 }

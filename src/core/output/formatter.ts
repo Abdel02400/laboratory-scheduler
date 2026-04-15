@@ -9,7 +9,7 @@ import type { ScheduleEntry, ScheduleEntryOutput, ScheduleResult, UnscheduledEnt
 import { formatTime } from '@/core/utils/time';
 
 const ALGORITHM_VERSION = 'v1.0';
-const CONSTRAINTS_APPLIED = ['priority_management', 'specialization_matching', 'lunch_breaks', 'equipment_compatibility', 'cleaning_delays', 'efficiency_coefficients', 'parallelism_optimization'];
+const CONSTRAINTS_APPLIED = ['priority_management', 'specialization_matching', 'lunch_breaks', 'equipment_compatibility', 'maintenance_avoidance', 'cleaning_delays', 'efficiency_coefficients', 'parallelism_optimization'];
 
 export function formatOutput(input: LabInput, result: ScheduleResult, metrics: Metrics, samples: Sample[], technicians: Technician[]): PlanifyLabOutput {
     return {
