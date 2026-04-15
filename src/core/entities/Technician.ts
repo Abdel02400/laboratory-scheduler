@@ -1,67 +1,57 @@
 import type { Specialty } from '@/core/types/enums/specialty';
-import type { Technician as TechnicianDTO, TechnicianId } from '@/core/types/models/technician';
-import type { TimeString } from '@/core/types/primitives/time';
-import { overlaps, parseRange, type TimeRange } from '@/core/utils/time';
+import type { TechnicianInput } from '@/core/types/inputs/technician';
+import type { TechnicianId } from '@/core/types/primitives/ids';
 
 export class Technician {
-    private readonly id: TechnicianId;
-    private readonly name: string;
-    private readonly specialty: Specialty[];
-    private readonly efficiency: number;
-    private readonly startTime: TimeString;
-    private readonly endTime: TimeString;
-    private readonly lunchBreak: string;
-    private readonly lunch: TimeRange;
+    private readonly _id: TechnicianId;
+    private readonly _name: string;
+    private readonly _speciality?: Specialty;
+    private readonly _specialty?: Specialty[];
+    private readonly _startTime: string;
+    private readonly _endTime: string;
+    private readonly _efficiency?: number;
+    private readonly _lunchBreak?: string;
 
-    constructor(dto: TechnicianDTO) {
-        this.id = dto.id;
-        this.name = dto.name;
-        this.specialty = dto.specialty;
-        this.efficiency = dto.efficiency;
-        this.startTime = dto.startTime;
-        this.endTime = dto.endTime;
-        this.lunchBreak = dto.lunchBreak;
-        this.lunch = parseRange(dto.lunchBreak);
+    constructor(dto: TechnicianInput) {
+        this._id = dto.id;
+        this._name = dto.name;
+        this._speciality = dto.speciality;
+        this._specialty = dto.specialty;
+        this._startTime = dto.startTime;
+        this._endTime = dto.endTime;
+        this._efficiency = dto.efficiency;
+        this._lunchBreak = dto.lunchBreak;
     }
 
-    getId(): TechnicianId {
-        return this.id;
+    get id() {
+        return this._id;
     }
 
-    getName(): string {
-        return this.name;
+    get name() {
+        return this._name;
     }
 
-    getSpecialty(): Specialty[] {
-        return this.specialty;
+    get speciality() {
+        return this._speciality;
     }
 
-    getEfficiency(): number {
-        return this.efficiency;
+    get specialty() {
+        return this._specialty;
     }
 
-    getStartTime(): TimeString {
-        return this.startTime;
+    get startTime() {
+        return this._startTime;
     }
 
-    getEndTime(): TimeString {
-        return this.endTime;
+    get endTime() {
+        return this._endTime;
     }
 
-    getLunchBreak(): string {
-        return this.lunchBreak;
+    get efficiency() {
+        return this._efficiency;
     }
 
-    canHandle(specialty: string): boolean {
-        return this.specialty.some((s) => s === specialty);
-    }
-
-    adjustedDuration(baseDuration: number): number {
-        return Math.round(baseDuration / this.efficiency);
-    }
-
-    adjustForLunch(start: number, duration: number): number {
-        const window = { start, end: start + duration };
-        return overlaps(window, this.lunch) ? this.lunch.end : start;
+    get lunchBreak() {
+        return this._lunchBreak;
     }
 }

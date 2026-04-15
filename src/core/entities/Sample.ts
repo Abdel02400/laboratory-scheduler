@@ -1,66 +1,60 @@
-import type { AnalysisTime, AnalysisType } from '@/core/types/enums/analysis';
-import type { PatientInfo } from '@/core/types/models/patient';
-import { PRIORITY, type Priority } from '@/core/types/enums/priority';
-import type { Sample as SampleDTO, SampleId, SampleType } from '@/core/types/models/sample';
-import type { TimeString } from '@/core/types/primitives/time';
-import { parseTime } from '@/core/utils/time';
+import type { AnalysisType } from '@/core/types/enums/analysis';
+import type { Priority } from '@/core/types/enums/priority';
+import type { SampleType } from '@/core/types/enums/sampleType';
+import type { PatientInfo } from '@/core/types/inputs/patientInfo';
+import type { SampleInput } from '@/core/types/inputs/sample';
+import type { PatientId, SampleId } from '@/core/types/primitives/ids';
 
 export class Sample {
-    private readonly id: SampleId;
-    private readonly priority: Priority;
-    private readonly type: SampleType;
-    private readonly analysisType: AnalysisType;
-    private readonly analysisTime: AnalysisTime;
-    private readonly arrivalTime: TimeString;
-    private readonly patientInfo: PatientInfo;
+    private readonly _id: SampleId;
+    private readonly _type: SampleType;
+    private readonly _priority: Priority;
+    private readonly _analysisTime: number;
+    private readonly _arrivalTime: string;
+    private readonly _patientId?: PatientId;
+    private readonly _analysisType?: AnalysisType;
+    private readonly _patientInfo?: PatientInfo;
 
-    constructor(dto: SampleDTO) {
-        this.id = dto.id;
-        this.priority = dto.priority;
-        this.type = dto.type;
-        this.analysisType = dto.analysisType;
-        this.analysisTime = dto.analysisTime;
-        this.arrivalTime = dto.arrivalTime;
-        this.patientInfo = dto.patientInfo;
+    constructor(dto: SampleInput) {
+        this._id = dto.id;
+        this._type = dto.type;
+        this._priority = dto.priority;
+        this._analysisTime = dto.analysisTime;
+        this._arrivalTime = dto.arrivalTime;
+        this._patientId = dto.patientId;
+        this._analysisType = dto.analysisType;
+        this._patientInfo = dto.patientInfo;
     }
 
-    getId(): SampleId {
-        return this.id;
+    get id() {
+        return this._id;
     }
 
-    getPriority(): Priority {
-        return this.priority;
+    get type() {
+        return this._type;
     }
 
-    getType(): SampleType {
-        return this.type;
+    get priority() {
+        return this._priority;
     }
 
-    getAnalysisType(): AnalysisType {
-        return this.analysisType;
+    get analysisTime() {
+        return this._analysisTime;
     }
 
-    getAnalysisTime(): AnalysisTime {
-        return this.analysisTime;
+    get arrivalTime() {
+        return this._arrivalTime;
     }
 
-    getArrivalTime(): TimeString {
-        return this.arrivalTime;
+    get patientId() {
+        return this._patientId;
     }
 
-    getPatientInfo(): PatientInfo {
-        return this.patientInfo;
+    get analysisType() {
+        return this._analysisType;
     }
 
-    arrivalMinutes(): number {
-        return parseTime(this.arrivalTime);
-    }
-
-    isStat(): boolean {
-        return this.priority === PRIORITY.STAT;
-    }
-
-    isUrgent(): boolean {
-        return this.priority === PRIORITY.URGENT;
+    get patientInfo() {
+        return this._patientInfo;
     }
 }

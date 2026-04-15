@@ -1,5 +1,3 @@
-import type { Range } from '@/core/types/primitives/number';
-
 export const ANALYSIS_TYPES = {
     NUMERATION_COMPLETE: 'Numération complète',
     TROPONINE: 'Troponine',
@@ -26,5 +24,3 @@ export const ANALYSIS_TYPES = {
 export type AnalysisType = (typeof ANALYSIS_TYPES)[keyof typeof ANALYSIS_TYPES];
 
 export const ANALYSIS_TYPE_LIST = Object.values(ANALYSIS_TYPES) as readonly AnalysisType[];
-
-export type AnalysisTime = Range<1, 480>;

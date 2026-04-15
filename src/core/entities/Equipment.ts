@@ -1,58 +1,58 @@
-import type { Equipment as EquipmentDTO, EquipmentId } from '@/core/types/models/equipment';
+import type { CompatibleType } from '@/core/types/enums/compatibleType';
 import type { Specialty } from '@/core/types/enums/specialty';
-import { overlaps, parseRange, type TimeRange } from '@/core/utils/time';
+import type { EquipmentInput } from '@/core/types/inputs/equipment';
+import type { EquipmentId } from '@/core/types/primitives/ids';
 
 export class Equipment {
-    private readonly id: EquipmentId;
-    private readonly name: string;
-    private readonly type: Specialty;
-    private readonly compatibleTypes: string[];
-    private readonly capacity: number;
-    private readonly maintenanceWindow: string;
-    private readonly maintenance: TimeRange;
-    private readonly cleaningTime: number;
+    private readonly _id: EquipmentId;
+    private readonly _name: string;
+    private readonly _type: Specialty;
+    private readonly _available?: boolean;
+    private readonly _compatibleTypes?: CompatibleType[];
+    private readonly _capacity?: number;
+    private readonly _cleaningTime?: number;
+    private readonly _maintenanceWindow?: string;
 
-    constructor(dto: EquipmentDTO) {
-        this.id = dto.id;
-        this.name = dto.name;
-        this.type = dto.type;
-        this.compatibleTypes = dto.compatibleTypes;
-        this.capacity = dto.capacity;
-        this.maintenanceWindow = dto.maintenanceWindow;
-        this.maintenance = parseRange(dto.maintenanceWindow);
-        this.cleaningTime = dto.cleaningTime;
+    constructor(dto: EquipmentInput) {
+        this._id = dto.id;
+        this._name = dto.name;
+        this._type = dto.type;
+        this._available = dto.available;
+        this._compatibleTypes = dto.compatibleTypes;
+        this._capacity = dto.capacity;
+        this._cleaningTime = dto.cleaningTime;
+        this._maintenanceWindow = dto.maintenanceWindow;
     }
 
-    getId(): EquipmentId {
-        return this.id;
+    get id() {
+        return this._id;
     }
 
-    getName(): string {
-        return this.name;
+    get name() {
+        return this._name;
     }
 
-    getType(): Specialty {
-        return this.type;
+    get type() {
+        return this._type;
     }
 
-    getCompatibleTypes(): string[] {
-        return this.compatibleTypes;
+    get available() {
+        return this._available;
     }
 
-    getCapacity(): number {
-        return this.capacity;
+    get compatibleTypes() {
+        return this._compatibleTypes;
     }
 
-    getMaintenanceWindow(): string {
-        return this.maintenanceWindow;
+    get capacity() {
+        return this._capacity;
     }
 
-    getCleaningTime(): number {
-        return this.cleaningTime;
+    get cleaningTime() {
+        return this._cleaningTime;
     }
 
-    adjustForMaintenance(start: number, duration: number): number {
-        const window = { start, end: start + duration };
-        return overlaps(window, this.maintenance) ? this.maintenance.end : start;
+    get maintenanceWindow() {
+        return this._maintenanceWindow;
     }
 }

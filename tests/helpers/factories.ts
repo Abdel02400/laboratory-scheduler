@@ -1,9 +1,13 @@
+import { Constraints } from '@/core/entities/Constraints';
 import { Equipment } from '@/core/entities/Equipment';
+import { Laboratory } from '@/core/entities/Laboratory';
 import { Sample } from '@/core/entities/Sample';
 import { Technician } from '@/core/entities/Technician';
-import type { Equipment as EquipmentDTO } from '@/core/types/models/equipment';
-import type { Sample as SampleDTO } from '@/core/types/models/sample';
-import type { Technician as TechnicianDTO } from '@/core/types/models/technician';
+import type { ConstraintsInput } from '@/core/types/inputs/constraints';
+import type { EquipmentInput } from '@/core/types/inputs/equipment';
+import type { LaboratoryInput } from '@/core/types/inputs/laboratory';
+import type { SampleInput } from '@/core/types/inputs/sample';
+import type { TechnicianInput } from '@/core/types/inputs/technician';
 
 type SampleOverride = Partial<{
     id: string;
@@ -19,6 +23,7 @@ type TechnicianOverride = Partial<{
     id: string;
     name: string;
     specialty: Array<'BLOOD' | 'CHEMISTRY' | 'MICROBIOLOGY' | 'IMMUNOLOGY' | 'GENETICS'>;
+    speciality: 'BLOOD' | 'CHEMISTRY' | 'MICROBIOLOGY' | 'IMMUNOLOGY' | 'GENETICS';
     efficiency: number;
     startTime: string;
     endTime: string;
@@ -33,9 +38,23 @@ type EquipmentOverride = Partial<{
     capacity: number;
     maintenanceWindow: string;
     cleaningTime: number;
+    available: boolean;
 }>;
 
-export function makeSample(overrides: SampleOverride = {}): SampleDTO {
+type LaboratoryOverride = Partial<{
+    name: string;
+    openingHours: string;
+    date: string;
+}>;
+
+type ConstraintsOverride = Partial<{
+    maxProcessingTime: number;
+    priorityRules: Array<'STAT' | 'URGENT' | 'ROUTINE'>;
+    contaminationPrevention: boolean;
+    parallelProcessing: boolean;
+}>;
+
+export function makeSample(overrides: SampleOverride = {}): SampleInput {
     return {
         id: 'S001',
         priority: 'STAT',
@@ -45,10 +64,10 @@ export function makeSample(overrides: SampleOverride = {}): SampleDTO {
         arrivalTime: '08:30',
         patientInfo: { age: 42, service: 'Urgences', diagnosis: 'Suspicion hémorragie' },
         ...overrides,
-    } as SampleDTO;
+    } as SampleInput;
 }
 
-export function makeTechnician(overrides: TechnicianOverride = {}): TechnicianDTO {
+export function makeTechnician(overrides: TechnicianOverride = {}): TechnicianInput {
     return {
         id: 'TECH001',
         name: 'Dr. Test',
@@ -58,10 +77,10 @@ export function makeTechnician(overrides: TechnicianOverride = {}): TechnicianDT
         endTime: '17:00',
         lunchBreak: '12:00-13:00',
         ...overrides,
-    } as TechnicianDTO;
+    } as TechnicianInput;
 }
 
-export function makeEquipment(overrides: EquipmentOverride = {}): EquipmentDTO {
+export function makeEquipment(overrides: EquipmentOverride = {}): EquipmentInput {
     return {
         id: 'EQ001',
         name: 'Test Equipment',
@@ -71,7 +90,26 @@ export function makeEquipment(overrides: EquipmentOverride = {}): EquipmentDTO {
         maintenanceWindow: '06:00-07:00',
         cleaningTime: 10,
         ...overrides,
-    } as EquipmentDTO;
+    } as EquipmentInput;
+}
+
+export function makeLaboratory(overrides: LaboratoryOverride = {}): LaboratoryInput {
+    return {
+        name: 'Test Lab',
+        openingHours: '07:00-18:00',
+        date: '2025-03-15',
+        ...overrides,
+    };
+}
+
+export function makeConstraints(overrides: ConstraintsOverride = {}): ConstraintsInput {
+    return {
+        maxProcessingTime: 480,
+        priorityRules: ['STAT', 'URGENT', 'ROUTINE'],
+        contaminationPrevention: true,
+        parallelProcessing: true,
+        ...overrides,
+    } as ConstraintsInput;
 }
 
 export function makeSampleEntity(overrides: SampleOverride = {}): Sample {
@@ -84,4 +122,12 @@ export function makeTechnicianEntity(overrides: TechnicianOverride = {}): Techni
 
 export function makeEquipmentEntity(overrides: EquipmentOverride = {}): Equipment {
     return new Equipment(makeEquipment(overrides));
+}
+
+export function makeLaboratoryEntity(overrides: LaboratoryOverride = {}): Laboratory {
+    return new Laboratory(makeLaboratory(overrides));
+}
+
+export function makeConstraintsEntity(overrides: ConstraintsOverride = {}): Constraints {
+    return new Constraints(makeConstraints(overrides));
 }

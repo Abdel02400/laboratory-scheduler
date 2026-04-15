@@ -9,12 +9,7 @@
         "lint": "eslint .",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "load": "tsx src/cli/load.ts",
-        "resolve": "tsx src/cli/resolve.ts",
-        "sort": "tsx src/cli/sort.ts",
-        "match": "tsx src/cli/match.ts",
         "schedule": "tsx src/cli/schedule.ts",
-        "schedule:v2": "tsx src/cli/scheduleV2.ts",
         "test": "jest",
         "test:watch": "jest --watch"
     },

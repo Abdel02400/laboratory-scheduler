@@ -1,6 +1,4 @@
-import type { TimeString } from '@/core/types/primitives/time';
-
-export function parseTime(time: TimeString | string): number {
+export function parseTime(time: string): number {
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
 }

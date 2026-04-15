@@ -1,5 +1,5 @@
 import { Scheduler } from '@/core/scheduler/Scheduler';
-import { makeEquipmentEntity, makeSampleEntity, makeTechnicianEntity } from '@tests/helpers/factories';
+import { makeConstraintsEntity, makeEquipmentEntity, makeLaboratoryEntity, makeSampleEntity, makeTechnicianEntity } from '@tests/helpers/factories';
 
 describe('Scheduler', () => {
     it('schedules a single sample at its arrival time', () => {
@@ -53,20 +53,53 @@ describe('Scheduler', () => {
 
     it('applies the cleaning time between two samples on the same equipment slot', () => {
         const samples = [makeSampleEntity({ id: 'A', arrivalTime: '09:00', analysisTime: 30 }), makeSampleEntity({ id: 'B', arrivalTime: '09:00', analysisTime: 30 })];
-        const techs = [makeTechnicianEntity()];
+        const techs = [makeTechnicianEntity(), makeTechnicianEntity({ id: 'T2' })];
         const equipments = [makeEquipmentEntity({ capacity: 1, cleaningTime: 15 })];
 
         const { schedule } = new Scheduler().schedule(samples, techs, equipments);
         expect(schedule[1].startTime).toBeGreaterThanOrEqual(schedule[0].endTime + 15);
     });
 
-    it('marks a sample as unscheduled when no compatibleType matches and no fallback equipment exists', () => {
-        const samples = [makeSampleEntity({ analysisType: 'Unknown', type: 'TISSUE' })];
+    it('marks a sample as unscheduled when no compatibleType matches', () => {
+        const samples = [makeSampleEntity({ analysisType: 'Unknown thing', type: 'TISSUE' })];
         const techs = [makeTechnicianEntity()];
         const equipments = [makeEquipmentEntity({ type: 'BLOOD', compatibleTypes: ['Numération'] })];
 
         const { schedule, unscheduled } = new Scheduler().schedule(samples, techs, equipments);
         expect(schedule).toEqual([]);
         expect(unscheduled[0]).toMatchObject({ sampleId: 'S001', reason: 'No compatible equipment' });
+    });
+
+    it('honors laboratory opening hours for sample start and end', () => {
+        const samples = [makeSampleEntity({ arrivalTime: '06:00', analysisTime: 30 })];
+        const techs = [makeTechnicianEntity({ startTime: '05:00', endTime: '18:00', lunchBreak: undefined })];
+        const equipments = [makeEquipmentEntity({ maintenanceWindow: undefined })];
+        const lab = makeLaboratoryEntity({ openingHours: '08:00-17:00' });
+
+        const { schedule } = new Scheduler().schedule(samples, techs, equipments, lab);
+        expect(schedule[0].startTime).toBe(8 * 60);
+    });
+
+    it('lets a non-STAT sample fit in the gap before a later-arriving STAT reservation', () => {
+        const samples = [makeSampleEntity({ id: 'STAT_LATE', priority: 'STAT', arrivalTime: '14:00', analysisTime: 30 }), makeSampleEntity({ id: 'URGENT_EARLY', priority: 'URGENT', arrivalTime: '09:00', analysisTime: 60 })];
+        const techs = [makeTechnicianEntity({ efficiency: 1.0, startTime: '08:00', endTime: '17:00', lunchBreak: undefined })];
+        const equipments = [makeEquipmentEntity({ capacity: 1, cleaningTime: 0, maintenanceWindow: undefined })];
+
+        const { schedule } = new Scheduler().schedule(samples, techs, equipments);
+        const stat = schedule.find((e) => e.sampleId === 'STAT_LATE');
+        const urgent = schedule.find((e) => e.sampleId === 'URGENT_EARLY');
+        expect(stat?.startTime).toBe(14 * 60);
+        expect(urgent?.startTime).toBe(9 * 60);
+        expect(urgent?.endTime).toBe(10 * 60);
+    });
+
+    it('skips cleaning delay when contaminationPrevention is disabled', () => {
+        const samples = [makeSampleEntity({ id: 'A', arrivalTime: '09:00', analysisTime: 30 }), makeSampleEntity({ id: 'B', arrivalTime: '09:00', analysisTime: 30 })];
+        const techs = [makeTechnicianEntity(), makeTechnicianEntity({ id: 'T2' })];
+        const equipments = [makeEquipmentEntity({ capacity: 1, cleaningTime: 30 })];
+        const constraints = makeConstraintsEntity({ contaminationPrevention: false });
+
+        const { schedule } = new Scheduler().schedule(samples, techs, equipments, undefined, constraints);
+        expect(schedule[1].startTime).toBe(schedule[0].endTime);
     });
 });

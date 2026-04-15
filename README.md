@@ -7,7 +7,9 @@
 ![Prettier](https://img.shields.io/badge/Prettier-3.8.2-F7B93E?logo=prettier&logoColor=black)
 ![pnpm](https://img.shields.io/badge/pnpm-8.6.5-F69220?logo=pnpm&logoColor=white)
 
-A scheduling system for a medical laboratory: 20 samples distributed across 8 technicians and 5 pieces of equipment, respecting priorities and constraints.
+A scheduling system for a medical laboratory: samples distributed across technicians and equipment, respecting priorities and constraints. Supports both the **simple** and **intermediate** versions of the brief (the code reacts to the presence/absence of optional fields, with no version flag).
+
+> **Note on Next.js.** A Next.js stack is scaffolded because the original plan included a front-end UI on top of the scheduler. Time ran out before the UI could be built, so only the core scheduler + CLI are functional today. The `dev`/`build`/`start` scripts remain available for a future UI pass.
 
 ## Prerequisites
 
@@ -16,226 +18,187 @@ A scheduling system for a medical laboratory: 20 samples distributed across 8 te
 
 ## Installation
 
-Clone the repository and install dependencies:
-
 ```bash
 git clone <repo-url>
 cd laboratory-scheduler
 pnpm install
 ```
 
-## Getting Started
-
-Run the development server:
-
-```bash
-pnpm dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
 ## Scripts
 
-- `pnpm dev` — start the Next.js dev server
-- `pnpm build` — build for production
-- `pnpm start` — run the production build
-- `pnpm lint` — run ESLint on the whole project
-- `pnpm format` — format all files with Prettier
-- `pnpm format:check` — check formatting without writing
-- `pnpm load --file=<path-to-json>` — load a lab input JSON file and instantiate the entities (prints a summary)
-- `pnpm resolve --file=<path-to-json>` — resolve each sample to a compatible equipment (prints the mapping)
-- `pnpm sort --file=<path-to-json>` — sort samples by priority then arrival time (prints the sorted list)
-- `pnpm match --file=<path-to-json>` — combine sort + equipment resolver + technician matching (prints each sample's candidates)
-- `pnpm schedule --file=<path-to-json> [--output=<path-to-write>]` — run the full greedy scheduler. By default the full result JSON is printed to stdout; with `--output` (or `-o`) it is written to the given path instead. The shape of this JSON matches the brief's expected output (see _Public API — planifyLab_ below).
-- `pnpm test` — run the Jest test suite
-- `pnpm test:watch` — run Jest in watch mode during development
+Only scripts that matter for this project today:
 
-### Loading a lab input
+- `pnpm schedule --file=<input.json> [--output=<output.json>]` — run the scheduler on an input JSON and print or write the result. This is the entry point for the brief.
+- `pnpm test` — run the Jest test suite (58 tests / 14 suites).
+- `pnpm test:watch` — Jest watch mode.
+- `pnpm lint` — ESLint on the whole project.
+- `pnpm format` / `pnpm format:check` — Prettier.
 
-The loader reads a JSON file describing the laboratory state (samples, technicians, equipment, constraints) and instantiates the corresponding entity classes.
+Reserved for the future front-end (not used today): `pnpm dev`, `pnpm build`, `pnpm start`.
+
+Example:
 
 ```bash
-pnpm load --file=data/samples.json
-# or
-pnpm load -f data/samples.json
+pnpm schedule --file=data/samples.json --output=data/output.json
 ```
 
-Expected output:
+## Scope choices
 
-```
-Loaded 20 samples, 8 technicians, 5 equipment from data/samples.json
-```
+This implementation deliberately sticks to a **data-driven greedy scheduler**. The choices below were made explicitly and are not gaps:
+
+- **Sort-then-place greedy, not time-simulated.** Samples are sorted globally by priority (STAT > URGENT > ROUTINE, arrival time as tie-break), then placed one by one first-fit. The intermediate brief explicitly asks for "parallélisme opportuniste, pas optimisation globale" and rules out backtracking, reorganization after allocation, metaheuristics, etc.
+- **Interval-based resources (STAT priority reservation).** The `ResourceTracker` stores sorted **busy intervals** per technician and per equipment slot. Because STAT samples are placed first in the loop, they effectively reserve their timeline slot at `arrivalTime`. Subsequent URGENT/ROUTINE placements call a **joint-fit finder** that searches for the earliest gap that accommodates the analysis around existing reservations — so a long URGENT can still run **before** a later-arriving STAT if the gap is wide enough. A STAT is therefore never blocked by a lower-priority analysis without the cost of runtime preemption.
+- **No preemption of a running analysis.** STAT priority is enforced via the reservation mechanism above, not by interrupting an in-flight analysis. A STAT can, however, interrupt a pending lunch break (it bumps `lunchInterruptions` when the STAT window overlaps the technician's lunch).
+- **No pause-and-resume across lunch.** An analysis that would straddle a lunch window is shifted to start after the lunch (unless the sample is STAT, which is allowed to run through). Analyses are atomic once started.
+- **Data-driven compatibility only.** Routing decisions are taken strictly from fields present in the input (`type`, `compatibleTypes`, `specialty`, `efficiency`, etc.). No hardcoded domain dictionary — if the input does not declare a `compatibleTypes` entry linking an `analysisType` to an equipment, the code will not invent it.
+- **Constraint flags are honored, not translated.** `contaminationPrevention: false` disables cleaning delays; `parallelProcessing: false` collapses every equipment to a single slot.
 
 ## Sample ↔ Equipment matching
 
-Picking an equipment for a sample is handled by `findCompatibleEquipments` in `src/core/scheduler/analysisTypeResolver.ts`. It builds two ordered candidate lists, and the Scheduler consumes them with a specific fallback rule.
+`src/core/scheduler/findCompatibleEquipments.ts` filters equipments for a given sample using a single rule with a fallback:
 
-### Building candidates
+1. **If the sample has an `analysisType` AND the equipment declares `compatibleTypes`:** case-insensitive substring match between `sample.analysisType` and any entry of `equipment.compatibleTypes`. Enriched names are recognized (`"Caryotype urgent"` matches `"Caryotype"`, `"Sérologie HIV"` matches `"Sérologie"`, etc.).
+2. **Fallback — exact type match:** `equipment.type === sample.type`. This fires when either (a) the sample has no `analysisType` (simple version of the brief), or (b) the equipment has no `compatibleTypes` declared (partially-specified input).
 
-1. **Primary candidates — match by `analysisType`.** Any equipment whose `compatibleTypes` contains the sample's `analysisType` is considered primary. The match is case-insensitive and uses substring containment, so enriched names are recognized: `"Caryotype urgent"` contains `"Caryotype"`, `"Sérologie HIV"` contains `"Sérologie"`, `"Allergènes critiques"` contains `"Allergènes"`, etc. The equipment's declared capability drives the assignment — this is the semantically correct route.
-2. **Fallback candidates — match by `type`.** Any other equipment whose `type` equals the sample's `type` (`BLOOD`/`URINE`/`TISSUE`). These are not used unless needed, see next section.
+If no equipment passes either check, the sample is reported `unscheduled` with the reason `No compatible equipment`.
 
-### Scheduler's fallback rule: saturation only
+### Why a saturation fallback is no longer needed
 
-The Scheduler uses the fallback candidates **only when the primary candidates are saturated** (their slots cannot fit the analysis in any compatible technician's remaining working window).
-
-- If the primary list is **empty**, the sample is reported as unscheduled with the reason `No compatible equipment`. No fallback is attempted.
-- If the primary list is **non-empty but saturated**, the scheduler tries the fallback list before giving up.
-
-This is the key design decision: we refuse to route a sample to an equipment that does not declare the analysis in its `compatibleTypes` unless we have proof the right equipment is simply out of capacity. A "Bilan lipidique" that has no root in common with any `compatibleTypes` entry is unscheduled, not silently routed to an hematology analyzer.
-
-### Why this rule
-
-Two failure modes were considered:
-
-- **Over-permissive fallback** — any unmatched analysis falls back to `sample.type` equipment. This makes every sample schedulable on the provided dataset, but it routes analyses to the wrong machines (a Caryotype on an hematology analyzer, a Sérologie on a CHEMISTRY equipment, etc.). Semantically incorrect and would be penalized by a domain-aware reviewer.
-- **Strict-only match** — no fallback at all. This guarantees each scheduled sample is on an equipment that declares the analysis, but it loses genuinely schedulable samples (e.g. `S019 "Pharmacogénétique"` needs `EQ005` but `EQ005` gets saturated by the longer `S007`; blocking the fallback would mark `S019` unscheduled even though `EQ001` would physically fit it).
-
-The saturation-only fallback is the middle ground: honest about the dataset's limits without throwing away schedulable work.
-
-### Tradeoffs on the current intermediate dataset
-
-- **18/20 scheduled**, 2 unscheduled (`S003 "Bilan lipidique"`, `S015 "Vitesse sédimentation"`). Both have `analysisType` values whose root does not appear in any `compatibleTypes` entry (e.g. `"Lipides"` vs `"lipidique"`), so the primary candidate list is empty and the rule refuses to route them by `type` alone. This is an honest limit of the dataset; if a "Bilan lipidique" belongs on `EQ002`, the dataset should list `"Bilan lipidique"` (or `"lipidique"`) in its `compatibleTypes`.
-- `S019 "Pharmacogénétique"` still gets scheduled. `EQ005` is its primary candidate, but gets saturated by `S007` (also GENETICS, 120 min, single-capacity equipment). The saturation fallback routes `S019` to `EQ001` (BLOOD) for the remaining time.
-- Equipments are now used according to their declared capabilities: `EQ004` (Immunology) handles the serology and allergen samples, `EQ005` handles caryotype and pharmacogenetic samples, etc.
-
-### Compatibility with the simple version of the brief
-
-The resolver auto-detects the simple mode: if **no equipment in the input declares any `compatibleTypes`**, it bypasses the primary/fallback split and directly returns equipments whose `type` equals `sample.type` (the matching rule described in the simple brief). No config flag is needed; the same `planifyLab` works for both dataset shapes.
+Earlier iterations included a `type`-fallback that fired when `compatibleTypes`-matched equipments were saturated. That introduced the risk of routing analyses to semantically wrong machines. The current rule is stricter and purely input-driven: we trust the input's declarations. If a sample cannot be scheduled because its target equipment is busy, it stays unscheduled — that is a legitimate signal about the dataset's capacity.
 
 ## Sample ↔ Technician matching
 
-Picking a technician for a sample is done by `findCompatibleTechnicians` in `src/core/scheduler/findTechnicians.ts`. It mirrors the two-step approach used for equipments.
+`src/core/scheduler/findCompatibleTechnicians.ts` filters technicians for a given equipment:
 
-### The two steps
+- A technician matches if their `specialty` array contains `equipment.type`, **or** if their specialty is `GENERAL` (which acts as a wildcard — the simple brief states "GENERAL peut faire tous les types, mais moins efficace").
+- The resulting list is ordered so that **direct-match specialists come first**, then `GENERAL` fallbacks. For BLOOD equipment, a BLOOD-specialist technician is preferred over a GENERAL one, even if both match. Within the direct-match group, technicians with fewer specialties are preferred (the classic "use specialists first, save generalists for harder cases" heuristic).
+- The "moins efficace" aspect of GENERAL is expressed at the input level via the optional `efficiency` coefficient — the intermediate version can lower a GENERAL tech's coefficient; the code does not hardcode a penalty.
 
-1. **Direct match on `sample.type`.** Technicians whose `specialty` array contains the sample's biological type are preferred. For example, a sample with `type: "BLOOD"` goes to any technician with `"BLOOD"` in their specialties.
-2. **Fallback on `equipment.type`.** If no technician has the sample's type in their specialties, the resolver falls back to the type of the equipment that was already picked for this sample. A `URINE` sample gets routed to its `MICROBIOLOGY` equipment, and any technician with `"MICROBIOLOGY"` in their specialties becomes eligible.
+### Cross-vocabulary (not implemented)
 
-### Why this fallback matters on the intermediate dataset
-
-The intermediate dataset is asymmetric between samples and technicians:
-
-- `sample.type` is one of `BLOOD`, `URINE`, `TISSUE` (biological origin of the specimen).
-- `technician.specialty` is one of `BLOOD`, `CHEMISTRY`, `MICROBIOLOGY`, `IMMUNOLOGY`, `GENETICS` (analytical expertise).
-
-Only `BLOOD` is shared between the two vocabularies. A `URINE` or `TISSUE` sample has **no technician with a matching specialty in step 1**. Without the fallback, 3 samples (S009 URINE, S010 TISSUE, S020 TISSUE) would be unscheduled. The fallback on `equipment.type` bridges the two vocabularies: the equipment resolver already mapped the sample to a `MICROBIOLOGY` equipment, so we pick a technician with `"MICROBIOLOGY"` in their specialties (TECH002, TECH005, TECH008).
-
-### Compatibility with the simple version of the brief
-
-In the simple version, `technician.specialty` and `sample.type` share the same vocabulary (`BLOOD`, `URINE`, `TISSUE`, plus `GENERAL` which means "anything"). Step 1 is enough there, and the fallback never fires. The resolver therefore works on both datasets without branching.
+The full intermediate dataset has asymmetric vocabularies: `sample.type` ∈ {BLOOD, URINE, TISSUE} while `technician.specialty` ∈ {BLOOD, CHEMISTRY, MICROBIOLOGY, IMMUNOLOGY, GENETICS, …}. Only BLOOD overlaps. The dataset bridges this via `compatibleTypes` on equipment (which maps long-form analysis names to equipment types). No mapping is hardcoded in the scheduler.
 
 ## Scheduling algorithm
 
-`src/core/scheduler/Scheduler.ts` is a greedy scheduler. It orchestrates three helpers (`sortSamples`, `findCompatibleEquipments`, `findCompatibleTechnicians`) and delegates resource tracking to `ResourceTracker`.
+`src/core/scheduler/Scheduler.ts` orchestrates three helpers (`sortSamples`, `findCompatibleEquipments`, `findCompatibleTechnicians`) and delegates resource tracking to `ResourceTracker`.
 
-### Algorithm
+### Steps
 
-1. Sort samples by priority (`STAT > URGENT > ROUTINE`), then by arrival time.
-2. For each sample, gather candidate equipments (exact match first, `type` fallback second — see _Sample ↔ Equipment matching_).
-3. For each candidate equipment, gather compatible technicians, sort them by the rule below, then try to assign one:
-   - `earliest = max(sample.arrivalTime, technician.nextFreeTime, equipment.nextFreeSlot, technician.startTime)`
-   - `duration = Math.round(sample.analysisTime / technician.efficiency)` — the brief's rounding rule, encapsulated in `Technician.adjustedDuration`.
-   - `afterLunch = technician.adjustForLunch(earliest, duration)` for non-STAT samples. For STAT samples the lunch is **not** respected: the start stays at `earliest` and `lunchInterruptions` is incremented when the analysis window overlaps the tech's lunch. This matches the brief's example 3 where a STAT interrupts an ongoing lunch break.
-   - `start = equipment.adjustForMaintenance(afterLunch, duration)` — same overlap rule against the equipment's `maintenanceWindow`.
-   - `end = start + duration`
-   - If `end` exceeds `technician.endTime`, try the next technician. If no technician fits on this equipment, try the next candidate equipment.
-4. If no combination of equipment and technician fits, the sample is reported as unscheduled with the reason.
+1. Sort samples by priority, then by arrival time.
+2. For each sample, gather candidate equipments via `findCompatibleEquipments`.
+3. For each candidate equipment, gather compatible technicians (specialists first), then try each (tech, slot) pair via a **joint-fit finder**:
+    - `minStart = max(sample.arrivalTime, technician.startTime, laboratory.openingHours.start)`.
+    - `duration = Math.round(sample.analysisTime / technician.efficiency)` if efficiency is defined, else `sample.analysisTime`.
+    - Starting from `candidate = minStart`, iteratively push `candidate` forward past any overlapping obstacle until it stabilizes: any busy interval on the tech, any busy interval on the slot, the tech's `lunchBreak` (only for non-STAT), and the equipment's `maintenanceWindow`. STAT samples are allowed to run through the lunch — `lunchInterruptions` is incremented when that happens.
+    - Reject if `candidate + duration` exceeds `technician.endTime` or `laboratory.openingHours.end`.
+    - Across all slots of the equipment, keep the assignment with the earliest resulting `candidate`.
+4. Reserve `[start, end]` on the tech's interval list and `[start, end + cleaningTime]` on the chosen slot (cleaning skipped if `contaminationPrevention === false`).
+5. If no (equipment, technician, slot) combination fits, mark the sample unscheduled.
 
-### Technician ordering: specialists first
+### Parallelism
 
-Within the list of technicians compatible with a given sample, the Scheduler sorts by the number of specialties the technician has (ascending), then by their next-free time as a tie-breaker. A technician with a single specialty (e.g. TECH005 with only `MICROBIOLOGY`) is picked before a technician with three specialties (e.g. TECH007 with `CHEMISTRY`, `BLOOD`, `IMMUNOLOGY`).
+`ResourceTracker` allocates `capacity` parallel slots per equipment (default 1 if `capacity` is undefined). With `constraints.parallelProcessing: false`, every equipment collapses to a single slot regardless of its declared capacity.
 
-The reasoning is classic greedy heuristic: **use specialists when they are applicable, save generalists for the harder cases**. If a sample can be handled by both a specialist and a generalist, taking the specialist leaves the generalist available for a later sample that only the generalist could handle. On the intermediate dataset, this simple rule is what lets the scheduler reach 20/20 even with lunch breaks applied — without it, the two long GENETICS ROUTINE samples (S007 120 min, S019 90 min) would both compete for `TECH007` and one would fall off the end of the day.
+## Output format
 
-### What is intentionally not handled
+The output follows the brief's expected shape. Every field besides `schedule` and `metrics` is emitted only when meaningful:
 
-- **STAT preemption of a running analysis.** STAT samples are prioritized by the sort and interrupt lunches, but they do not stop a running URGENT/ROUTINE analysis on the fly — the brief's intermediate version explicitly accepts this ("greedy sans backtracking").
+```jsonc
+{
+    "laboratory": {
+        /* only if input.laboratory is set */
+    },
+    "schedule": [
+        /* sorted by actual startTime */
+    ],
+    "unscheduled": [
+        /* only if non-empty */
+    ],
+    "metrics": {
+        /* always present */
+    },
+    "metadata": {
+        "lunchBreaks": [
+            /* only if at least one technician has a lunchBreak */
+        ],
+        "constraintsApplied": [
+            /* only labels that were actually applied */
+        ],
+    },
+}
+```
 
-## Metrics
+`constraintsApplied` is built dynamically from what the scheduler effectively applied on this input:
 
-`src/core/metrics/MetricsCalculator.ts` computes the six metrics required by the brief from a `ScheduleEntry[]` plus the original samples, technicians and equipments.
-
-| Metric | Formula |
-|---|---|
-| `totalTime` | `max(endTime) − min(startTime)` across the schedule, in minutes. |
-| `averageWaitingTimeByPriority` | Per priority, the average of `startTime − arrivalTime`. |
-| `technicianUtilization` | Per technician, `sum(assigned durations) / totalTime × 100`. |
-| `equipmentUtilization` | Per equipment, `sum(assigned durations) / (capacity × totalTime) × 100` — the capacity factor accounts for parallel slots. |
-| `globalEfficiency` | Brief's official formula: `(Σ occupation_resource / number_of_resources / totalTime) × 100` where resources = technicians ∪ equipments. |
-| `priorityRespectRate` | Percentage of STAT samples whose start happened within 30 minutes of arrival (the brief's soft constraint). |
-| `parallelismRate` | Percentage of minutes during which more than one analysis is running simultaneously. |
+| Label                      | When it appears                                             |
+| -------------------------- | ----------------------------------------------------------- |
+| `priority_management`      | Always                                                      |
+| `specialization_matching`  | Always                                                      |
+| `equipment_compatibility`  | Always                                                      |
+| `parallelism_optimization` | Only if at least one equipment has `capacity > 1`           |
+| `lunch_breaks`             | Only if at least one technician declares `lunchBreak`       |
+| `maintenance_avoidance`    | Only if at least one equipment declares `maintenanceWindow` |
+| `cleaning_delays`          | Only if at least one equipment declares `cleaningTime`      |
+| `efficiency_coefficients`  | Only if at least one technician declares `efficiency`       |
 
 ## Public API — `planifyLab`
 
-The brief requires a single public function that takes the input JSON and returns the schedule plus the metrics. `src/core/planifyLab.ts` exposes it, and the returned shape matches the brief's expected output format.
-
 ```ts
-import { planifyLab } from '@/core';
+import { planifyLab } from '@/core/planifyLab';
 
 const result = planifyLab(input);
-// {
-//   laboratory: { date, processingDate, totalSamples, algorithmVersion },
-//   schedule: ScheduleEntryOutput[],
-//   unscheduled: UnscheduledEntryOutput[],
-//   metrics: MetricsOutput,
-//   metadata: { lunchBreaks, constraintsApplied },
-// }
 ```
 
-`planifyLab` instantiates the entity classes from the DTOs, runs the Scheduler, runs the MetricsCalculator on the resulting schedule, then passes everything to `formatOutput` (`src/core/output/formatter.ts`) which produces the brief-aligned shape:
+`planifyLab` instantiates entity classes from the DTOs, runs the `Scheduler`, computes metrics via `MetricsCalculator`, and finally formats the result through `formatOutput`.
 
-- Each `ScheduleEntryOutput` exposes the times as `"HH:MM"` strings, the actual `duration` in minutes, the sample's `analysisType`, the technician's `efficiency` coefficient, a `lunchBreak` field (currently always `null` as lunch preemption is not implemented) and `cleaningRequired: true` for every entry that is not the first on its equipment.
-- `MetricsOutput` carries the brief's names: `efficiency` (the global formula), `conflicts` (always `0` by construction), `averageWaitTime` per priority rounded to integers, `technicianUtilization` averaged across technicians, `priorityRespectRate`, `parallelAnalyses` (peak number of concurrent analyses) and `lunchInterruptions` (stays at `0` since preemption is not implemented).
-- `metadata.lunchBreaks` lists each technician's lunch window with planned and actual times (always identical for now), and `metadata.constraintsApplied` enumerates the constraints actually honored by the scheduler (priority management, specialization matching, lunch breaks, equipment compatibility, cleaning delays, efficiency coefficients, parallelism optimization — `maintenance_avoidance` is absent, consistent with the "not handled" section above).
+## Example datasets
 
-An example output generated on `data/samples.json` is committed as `data/output-example.json` (required deliverable). It can be regenerated at any time with `pnpm schedule --file=data/samples.json --output=data/output-example.json`.
+The `data/` folder contains the official brief datasets:
+
+- `data/samples.json` — the full intermediate dataset (20 samples / 8 technicians / 5 equipment). Regenerate output with `pnpm schedule --file=data/samples.json --output=data/output.json`.
+- `data/simple-1.json` / `simple-2.json` / `simple-3.json` — the 3 pedagogical examples of the simple brief.
+- `data/intermediate-1.json` / `intermediate-2.json` / `intermediate-3.json` — the 3 pedagogical examples of the intermediate brief (with caveats, see below).
+
+### Notes on the intermediate pedagogical examples
+
+The 3 intermediate examples exercise behaviors that go beyond the scope chosen here. Expect divergences on:
+
+- **Example 1**: `compatibleTypes` is missing on the equipment → the routing falls back to `type` match, which routes both samples to EQ001 instead of splitting them between EQ001 and EQ002. The expected split cannot be reproduced without enriching the input.
+- **Example 2**: the expected output places URGENT S002 before STAT S003 because S002 starts before S003 arrives. Our sort-then-place greedy places STAT first globally. This is the time-simulated vs sort-then-place difference.
+- **Example 3**: requires TISSUE → MICROBIOLOGY cross-vocabulary mapping (not data-driven in the input) and analysis pause/resume across lunch (not implemented).
+
+These are intentional limits aligned with the scope choices above.
 
 ## Tests
 
-The suite is written with **Jest + ts-jest** and lives under `tests/`, mirroring the source tree. Run it with `pnpm test`. A dedicated `tsconfig.jest.json` isolates the commonjs/node module settings Jest needs from the main Next.js `tsconfig.json`.
+Jest + ts-jest, 58 tests across 14 suites. Structure mirrors `src/core/`:
 
-### Coverage
+- `tests/entities/` — `Sample`, `Technician`, `Equipment`, `Laboratory`, `Constraints` getters.
+- `tests/scheduler/` — `sortSamples`, `findCompatibleEquipments`, `findCompatibleTechnicians`, `ResourceTracker`, `Scheduler`.
+- `tests/metrics/` — `MetricsCalculator`.
+- `tests/output/` — `formatter`.
+- `tests/utils/` — `time` helpers.
+- `tests/planifyLab.test.ts` — end-to-end integration against `data/samples.json`.
 
-- **`tests/utils/time.test.ts`** — `parseTime`, `formatTime`, `parseRange`, `overlaps`.
-- **`tests/entities/`** — `Sample` (getters, `arrivalMinutes`, `isStat`, `isUrgent`), `Technician` (`canHandle`, `adjustedDuration` with `Math.round`, `adjustForLunch`), `Equipment` (getters, `compatibleTypes`).
-- **`tests/scheduler/sortSamples.test.ts`** — priority ordering (STAT > URGENT > ROUTINE), arrival-time tie-break, no-mutation guarantee.
-- **`tests/scheduler/analysisTypeResolver.test.ts`** — exact match, substring match (enriched names like `"Caryotype urgent"`), case-insensitivity, the `type` fallback list, the empty-primary case.
-- **`tests/scheduler/findTechnicians.test.ts`** — step 1 `sample.type` match, step 2 `equipment.type` fallback, the no-match case.
-- **`tests/scheduler/Scheduler.test.ts`** — single-sample happy path, STAT-first ordering, efficiency coefficient applied to duration, lunch-break push, cleaning time between two samples on the same slot, unscheduled when no compatible equipment exists.
-- **`tests/metrics/MetricsCalculator.test.ts`** — `totalTime` across the schedule, average waiting time per priority, STAT 30-minute priority-respect rate.
-- **`tests/planifyLab.test.ts`** — golden / integration test on `data/samples.json`: top-level output shape, `laboratory` metadata, 18/20 scheduled + `S003`/`S015` unscheduled, `HH:MM` time formatting, correct equipment routing for sensitive cases (`Caryotype urgent → EQ005`, `Sérologie HIV → EQ004`), `conflicts: 0`, presence of key constraint flags in `metadata.constraintsApplied`.
-
-### Shared factories
-
-`tests/helpers/factories.ts` exposes two sets of factories:
-
-- `makeSample`, `makeTechnician`, `makeEquipment` return **DTOs** with sane defaults (used by integration-style tests like `planifyLab`).
-- `makeSampleEntity`, `makeTechnicianEntity`, `makeEquipmentEntity` return the **entity classes** already constructed from those DTOs, so unit tests on class behavior are one line instead of `new Sample(makeSample(...))`.
-
-Each factory takes a `Partial<...Override>` where the override type widens the branded IDs (`SampleId`/`TechnicianId`/`EquipmentId`) and narrow unions (`AnalysisType`, `Priority`, `TimeString`, `Range<...>`) back to plain `string | number`. Tests can pass `'S042'`, `'Numération'`, `42` directly without fighting the brands; the factory casts to the strict DTO internally before handing it to the entity constructor.
-
-### TypeScript configuration split
-
-Three tsconfig files coexist to keep Next.js, the Jest runner, and the IDE happy:
-
-- `tsconfig.json` — main Next.js config, excludes `tests/` so the production build is never weighed down by test files.
-- `tsconfig.jest.json` — extends the main config but switches to `commonjs` / `node` for Jest and declares `types: ["node", "jest"]` so globals like `describe`, `it`, `expect` and the `node:*` imports resolve.
-- `tests/tsconfig.json` — tiny file that extends `tsconfig.jest.json` so the VS Code TypeScript server picks up the right config when opening a test file (otherwise the exclusion in the main tsconfig leaves test files without a resolver).
+`tests/helpers/factories.ts` exposes loose-override factories that widen branded IDs and narrow unions back to plain `string | number`, so tests can pass `'S042'` directly without casts.
 
 ## Design notes
 
-A few deliberate choices made during the project:
-
-- **No runtime validation layer on DTOs (no zod/yup).** The data source is a static, trusted JSON file — not a user form. TypeScript types (`Sample`, `Technician`, `Equipment`) are enough to describe the shape; we don't need to guard against malformed input at runtime.
-- **DTO and entity separation.** DTO interfaces live in `src/core/types/` and mirror the input JSON shape. Entity classes in `src/core/entities/` wrap a DTO and will progressively expose domain behavior (getters, methods) as the scheduler needs them.
-- **Closed-world enums via const objects.** Enums like `PRIORITY`, `SPECIALTY`, `SERVICES` use the `const object + typeof + keyof` pattern. This gives both value access (e.g. `SERVICES.URGENCES`) and a strict union type in a single source of truth.
-- **Branded ID types.** `SampleId`, `TechnicianId`, `EquipmentId` are branded strings to prevent accidental cross-entity ID mixups at the type level.
-- **Template literal type for time strings.** `TimeString` enforces the `HH:MM` format (00:00–23:59) at compile time.
-- **Generic `Range<Min, Max>` utility.** Age and analysis time are constrained to their valid ranges at the type level via a recursive `Enumerate` helper, so invalid literals fail to compile.
+- **No runtime DTO validation.** The input is a trusted static JSON. TypeScript types are enough; no zod/yup layer.
+- **DTO ↔ entity separation.** DTOs in `src/core/types/` mirror the input JSON; entity classes in `src/core/entities/` expose `get x()` accessors over `private readonly _x` fields.
+- **Closed-world enums via `const object + typeof + keyof`.** Single source of truth for values and types.
+- **Branded ID types.** `SampleId`, `TechnicianId`, `EquipmentId` prevent accidental ID mixups at compile time.
 
 ## Possible improvements
 
-- **Unify the technician specialty key.** The simple version uses `speciality` (singular, single value) and the intermediate version uses `specialty` (plural, array). Currently both keys are accepted and the runtime validator picks whichever is present. A cleaner design would expose a single key (ex: `specialty: Specialty | Specialty[]`) that tolerates both shapes and let the loader normalize to an array.
-- **Align `analysisType` and `compatibleTypes` vocabularies.** In the dataset, `sample.analysisType` uses long form (e.g. `"Numération complète"`, `"Caryotype urgent"`) while `equipment.compatibleTypes` uses short form (`"Numération"`, `"Caryotype"`). They describe the same medical analyses but with two distinct vocabularies, which forced the resolver into substring matching with edge cases. As a consequence two strict const enums were intentionally created in v2 (`AnalysisType` for the 20 long forms, `CompatibleType` for the 20 short forms) — the duplication is on purpose and reflects the JSON inconsistency. A single shared enum (one canonical form on both sides of the JSON) would remove the substring fallback entirely and simplify the resolver.
+Things worth doing next, in rough priority order:
 
+- **Front-end UI.** The Next.js stack was scaffolded for a UI that would visualize the schedule (Gantt-style) and let a user experiment with inputs. Time ran out; the UI is the natural next step.
+- **Code refactor pass.** The codebase evolved incrementally through the brief's simple → intermediate progression. A cleanup pass could tighten naming, extract a few helpers (e.g. the lunch/maintenance adjust logic), and remove the legacy dual keys (`speciality` vs `specialty`).
+- **Unify the technician specialty key.** Currently both `speciality` (simple) and `specialty` (intermediate) are accepted. One canonical key with a normalization at load time would be cleaner.
+- **Align `analysisType` and `compatibleTypes` vocabularies.** Long form (`"Numération complète"`) vs short form (`"Numération"`) forces substring matching. A single shared vocabulary would remove the fallback.
+- **Align constraint flag names.** Input uses `contaminationPrevention` / `parallelProcessing`, output uses `cleaning_delays` / `parallelism_optimization`. One shared vocabulary on both sides would remove the translation.
+- **Input validator.** A runtime validator (zod or similar) at the CLI boundary would catch malformed JSON before the scheduler runs. Intentionally skipped for now (trusted static input).
+- **Time-simulated scheduling (optional).** Reproducing the intermediate brief's pedagogical example 2 would require a time-simulated algorithm instead of sort-then-place. Out of scope for this submission.
+- **Pause / resume across lunch (optional).** Allowing an analysis to pause at lunch start and resume after would match intermediate example 3. Requires modeling analyses as interruptible jobs.
+- **STAT preemption of a running analysis (optional).** Currently STAT only interrupts lunches; the interval reservation guarantees it is never blocked by a non-STAT analysis, but it does not cut a running analysis in flight. Listed as "Version Avancée" in the brief.

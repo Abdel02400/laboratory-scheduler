@@ -1,45 +1,63 @@
+import type { Constraints } from '@/core/entities/Constraints';
 import type { Equipment } from '@/core/entities/Equipment';
 import type { Technician } from '@/core/entities/Technician';
-import type { EquipmentId } from '@/core/types/models/equipment';
-import type { TechnicianId } from '@/core/types/models/technician';
-import { parseTime } from '@/core/utils/time';
+import type { EquipmentId, TechnicianId } from '@/core/types/primitives/ids';
+
+export interface Interval {
+    start: number;
+    end: number;
+}
 
 export class ResourceTracker {
-    private readonly techNextFree = new Map<TechnicianId, number>();
-    private readonly equipmentSlots = new Map<EquipmentId, number[]>();
+    private readonly techIntervals = new Map<TechnicianId, Interval[]>();
+    private readonly equipmentSlots = new Map<EquipmentId, Interval[][]>();
 
-    init(technicians: Technician[], equipments: Equipment[]): void {
-        this.techNextFree.clear();
+    init(technicians: Technician[], equipments: Equipment[], constraints?: Constraints): void {
+        this.techIntervals.clear();
         this.equipmentSlots.clear();
         for (const tech of technicians) {
-            this.techNextFree.set(tech.getId(), parseTime(tech.getStartTime()));
+            this.techIntervals.set(tech.id, []);
         }
+        const parallelOn = constraints?.parallelProcessing !== false;
         for (const eq of equipments) {
-            this.equipmentSlots.set(eq.getId(), new Array(eq.getCapacity()).fill(0));
-        }
-    }
-
-    getTechReady(id: TechnicianId): number {
-        return this.techNextFree.get(id)!;
-    }
-
-    setTechReady(id: TechnicianId, nextFree: number): void {
-        this.techNextFree.set(id, nextFree);
-    }
-
-    getEarliestSlot(id: EquipmentId): { index: number; readyAt: number } {
-        const slots = this.equipmentSlots.get(id)!;
-        let minIndex = 0;
-        for (let i = 1; i < slots.length; i += 1) {
-            if (slots[i] < slots[minIndex]) {
-                minIndex = i;
+            const capacity = parallelOn ? (eq.capacity ?? 1) : 1;
+            const slots: Interval[][] = [];
+            for (let i = 0; i < capacity; i += 1) {
+                slots.push([]);
             }
+            this.equipmentSlots.set(eq.id, slots);
         }
-        return { index: minIndex, readyAt: slots[minIndex] };
     }
 
-    useSlot(id: EquipmentId, index: number, nextFree: number): void {
-        const slots = this.equipmentSlots.get(id)!;
-        slots[index] = nextFree;
+    getTechIntervals(id: TechnicianId): Interval[] {
+        return this.techIntervals.get(id) ?? [];
+    }
+
+    getSlotIntervals(equipmentId: EquipmentId): Interval[][] {
+        return this.equipmentSlots.get(equipmentId) ?? [];
+    }
+
+    reserveTech(id: TechnicianId, start: number, end: number): void {
+        const list = this.techIntervals.get(id);
+        if (list === undefined) {
+            return;
+        }
+        ResourceTracker.insertSorted(list, { start, end });
+    }
+
+    reserveSlot(equipmentId: EquipmentId, index: number, start: number, end: number): void {
+        const slots = this.equipmentSlots.get(equipmentId);
+        if (slots === undefined || slots[index] === undefined) {
+            return;
+        }
+        ResourceTracker.insertSorted(slots[index], { start, end });
+    }
+
+    private static insertSorted(list: Interval[], interval: Interval): void {
+        let i = 0;
+        while (i < list.length && list[i].start <= interval.start) {
+            i += 1;
+        }
+        list.splice(i, 0, interval);
     }
 }
